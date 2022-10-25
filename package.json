@@ -1,0 +1,9 @@
+{
+  "devDependencies": {
+    "typescript": "^4.8.4"
+  },
+  "workspaces": [
+    "timing-system-front",
+    "timing-system-server"
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "name": "hakogym-timing-system-server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@trpc/server": "^10.0.0-proxy-beta.25",
+    "zod": "^3.19.1"
+  }
+}
