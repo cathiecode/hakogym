@@ -5,10 +5,16 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "esbuild --bundle src/index.ts --outfile=build/index.js && node build/index.js"
   },
   "dependencies": {
-    "@trpc/server": "^10.0.0-proxy-beta.25",
-    "zod": "^3.19.1"
+    "@grpc/grpc-js": "^1.7.3",
+    "date-fns": "^2.29.3",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/uuid": "^8.3.4",
+    "esbuild": "^0.15.12",
+    "ts-node": "^10.9.1"
   }
 }
