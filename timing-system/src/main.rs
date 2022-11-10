@@ -8,27 +8,29 @@ use thiserror::Error;
 trait Replayable<Command> {
     type CommandResult;
     type CommandError;
-    fn create() -> Self;
     fn command(&mut self, event: &Command) -> Result<Self::CommandResult, Self::CommandError>;
 }
 
-struct Replayer<Model, Command> {
+struct Replayer<Model, Command, Factory> {
     entity: Model,
     commands: Vec<Command>,
+    factory: Factory
 }
 
-impl<Model: Replayable<Command>, Command: Ord> Replayer<Model, Command> {
-    fn new() -> Replayer<Model, Command> {
+impl<Model: Replayable<Command>, Command: Ord, Factory: Fn() -> Model> Replayer<Model, Command, Factory> {
+    fn new(factory: Factory) -> Replayer<Model, Command, Factory> {
         Replayer {
-            entity: Model::create(),
+            entity: factory(),
             commands: Vec::new(),
+            factory
         }
     }
 
-    fn from_commands(commands: Vec<Command>) -> Replayer<Model, Command> {
+    fn from_commands(factory: Factory, commands: Vec<Command>) -> Replayer<Model, Command, Factory> {
         let mut replayer = Replayer {
-            entity: Model::create(),
+            entity: factory(),
             commands,
+            factory,
         };
 
         replayer.recalc();
@@ -60,14 +62,14 @@ impl<Model: Replayable<Command>, Command: Ord> Replayer<Model, Command> {
     }
 
     fn recalc(&mut self) {
-        self.entity = Model::create();
+        self.entity = (self.factory)();
         for command in self.commands.iter() {
             self.entity.command(command);
         }
     }
 }
 
-impl<Model, T> AsRef<Model> for Replayer<Model, T> {
+impl<Model, T, U> AsRef<Model> for Replayer<Model, T, U> {
     fn as_ref(&self) -> &Model {
         &self.entity
     }
@@ -93,6 +95,8 @@ enum AppError {
     TrackSpecifiedCarNotFound,
     #[error("There is no running car")]
     TrackNobodyRunnning,
+    #[error("Some assertion failed; application logic may wrong")]
+    LogicError,
 }
 
 enum TimerState {
@@ -155,14 +159,14 @@ impl Timer {
 #[derive(Clone, Copy, Eq, PartialEq)]
 struct CarId(i64);
 
-struct Car {
+struct RunningCar {
     timer: Timer,
     id: CarId,
 }
 
-impl Car {
-    fn new(id: CarId) -> Car {
-        Car {
+impl RunningCar {
+    fn new(id: CarId) -> RunningCar {
+        RunningCar {
             timer: Timer::new(),
             id,
         }
@@ -176,13 +180,13 @@ impl Car {
         self.timer.stop(date)
     }
 
-    fn time(&mut self, date: DateTime<Utc>) -> Result<Duration> {
+    fn time(&self, date: DateTime<Utc>) -> Result<Duration> {
         self.timer.get_time(date)
     }
 
-    fn edit_time(&mut self, time: Duration) -> Result<()> {
+    /*fn edit_time(&mut self, time: Duration) -> Result<()> {
         self.timer.set_time(time)
-    }
+    }*/
 
     fn getId(&self) -> CarId {
         self.id
@@ -190,14 +194,22 @@ impl Car {
 }
 
 struct Track {
-    running_cars: VecDeque<Car>,
-    pending_car: Option<Car>,
+    running_cars: VecDeque<RunningCar>,
+    pending_car: Option<RunningCar>,
     overwrap_limit: i64,
 }
 
 impl Track {
+    pub fn new(overwrap_limit: i64) -> Track {
+        Track {
+            running_cars: VecDeque::new(),
+            pending_car: None,
+            overwrap_limit,
+        }
+    }
+
     pub fn register_next_car(&mut self, carId: CarId) -> Result<()> {
-        self.pending_car = Some(Car::new(carId));
+        self.pending_car = Some(RunningCar::new(carId));
         Ok(())
     }
 
@@ -216,22 +228,30 @@ impl Track {
         }
     }
 
-    pub fn stop(&mut self, date: DateTime<Utc>, car_id: Option<CarId>) -> Result<()> {
+    pub fn goal(&mut self, date: DateTime<Utc>, car_id: Option<CarId>) -> Result<TimeResult> {
         let (car_index, car) = if let Some(car_id) = car_id {
             self.find_running_car(car_id)?
-            
         } else {
-            self.running_cars.iter_mut().next().map_or(Err(AppError::TrackNobodyRunnning), |v| Ok((0 as usize, v)))?
+            self.running_cars
+                .iter_mut()
+                .next()
+                .map_or(Err(AppError::TrackNobodyRunnning), |v| Ok((0 as usize, v)))?
         };
 
         car.stop(date)?;
 
-        self.running_cars.remove(car_index);
+        let car = self
+            .running_cars
+            .remove(car_index)
+            .ok_or(AppError::LogicError)?;
 
-        Ok(())
+        Ok(TimeResult {
+            duration: car.time(date)?,
+            car_id: car.getId(),
+        })
     }
 
-    fn find_running_car(&mut self, car_id: CarId) -> Result<(usize, &mut Car)> {
+    fn find_running_car(&mut self, car_id: CarId) -> Result<(usize, &mut RunningCar)> {
         if let Some(index) = self
             .running_cars
             .iter()
@@ -243,6 +263,48 @@ impl Track {
         }
     }
 }
+
+struct TimeResult {
+    duration: Duration,
+    car_id: CarId,
+}
+
+impl TimeResult {
+    fn get_duration(&self) -> Duration {
+        self.duration
+    }
+
+    fn get_car_id(&self) -> CarId {
+        self.car_id
+    }
+}
+
+
+struct Competition {
+    
+}
+
+impl Competition {
+
+}
+
+enum CompetitionEvent {
+    
+}
+
+impl Replayable<CompetitionEvent> for Competition {
+    type CommandResult = ();
+
+    type CommandError = anyhow::Error;
+
+    fn command(&mut self, event: &CompetitionEvent) -> Result<Self::CommandResult, Self::CommandError> {
+        
+        Ok(())
+    }
+}
+
+
+struct CompetitionController {}
 
 fn main() {
     println!("Hello, world!");
