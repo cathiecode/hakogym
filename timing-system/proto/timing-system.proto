@@ -1,0 +1,29 @@
+syntax = "proto3";
+package timingsystem;
+
+service TimingSystem {
+    rpc CreateCompetition (CreateCompetitionRequest) returns(CommandReply) {}
+    rpc RegisterNextCar (RegisterNextCarRequest) returns (CommandReply) {}
+    rpc GetRegisteredNextCar (GetRegisteredNextCarRequest) returns (GetRegisteredNextCarReply) {}
+}
+
+message CommandReply {
+    
+}
+
+message CreateCompetitionRequest {
+    string overlapLimit = 1;
+}
+
+message RegisterNextCarRequest {
+    string carId = 1;
+    string trackId = 2;
+}
+
+message GetRegisteredNextCarRequest {
+    string trackId = 1;
+}
+
+message GetRegisteredNextCarReply {
+    string carId = 1;
+}
