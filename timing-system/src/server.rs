@@ -14,7 +14,7 @@ use crate::{
     MockCompetitionConfigurationRepository, TimingSystemApp,
 };
 
-use self::proto::{CommandReply, GetRegisteredNextCarReply, SubscribeStateChangeReply};
+use self::proto::{CommandReply, GetRegisteredNextCarReply, SubscribeStateChangeReply, GetCurrentTracksReply};
 
 pub mod proto {
     tonic::include_proto!("timingsystem");
@@ -66,17 +66,19 @@ impl TimingSystemAppController {
 impl TimingSystem for TimingSystemAppController {
     async fn create_competition(
         &self,
-        _: Request<proto::CreateCompetitionRequest>,
+        request: Request<proto::CreateCompetitionRequest>,
     ) -> Result<Response<proto::CommandReply>, Status> {
+        let params = request.get_ref();
         self.competition
             .lock()
             .await
-            .create_competition(CompetitionConfigurationId::new("mock_competition_id"))
+            .create_competition(CompetitionConfigurationId::new(&params.competition_configuration_id))
             .await
             .map_err(|e| Status::failed_precondition(e.to_string()))?;
         self.notify_change().await?;
         Ok(Response::new(CommandReply {}))
     }
+
     async fn register_next_car(
         &self,
         request: Request<proto::RegisterNextCarRequest>,
@@ -126,6 +128,22 @@ impl TimingSystem for TimingSystemAppController {
         Ok(Response::new(CommandReply {}))
     }
 
+    async fn get_current_tracks(
+        &self,
+        _: Request<proto::GetCurrentTracksRequest>,
+    ) -> Result<Response<proto::GetCurrentTracksReply>, Status> {
+        let track_id = self
+            .competition
+            .lock()
+            .await
+            .get_current_tracks()
+            .map_err(|e| Status::failed_precondition(e.to_string()))?;
+        Ok(Response::new(GetCurrentTracksReply {
+            track_id
+        }))
+    }
+
+
     async fn get_registered_next_car(
         &self,
         request: Request<proto::GetRegisteredNextCarRequest>,
@@ -137,7 +155,8 @@ impl TimingSystem for TimingSystemAppController {
             .get_registered_next_car(&request.get_ref().track_id)
             .map_err(|e| Status::failed_precondition(e.to_string()))?;
         Ok(Response::new(GetRegisteredNextCarReply {
-            car_id: registered_next_car,
+            //car_id: registered_next_car,
+            car_id: None,
         }))
     }
 

@@ -6,6 +6,7 @@
   },
   "workspaces": [
     "timing-system-front",
-    "timing-system-server"
+    "timing-system-server",
+    "timing-system-front-gateway"
   ]
 }

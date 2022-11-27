@@ -388,9 +388,17 @@ struct Competition {
 }
 
 enum CompetitionEventKind {
-    RegisterNextCar { track_id: TrackId, car_id: CarId },
-    Start { track_id: TrackId },
-    Stop { track_id: TrackId, car_id: Option<CarId> },
+    RegisterNextCar {
+        track_id: TrackId,
+        car_id: CarId,
+    },
+    Start {
+        track_id: TrackId,
+    },
+    Stop {
+        track_id: TrackId,
+        car_id: Option<CarId>,
+    },
 }
 
 struct CompetitionEvent {
@@ -433,14 +441,21 @@ impl Competition {
         Ok(())
     }
 
-    fn stop(&mut self, timestamp: TimeStamp, track_id: &TrackId, car_id: Option<&CarId>) -> Result<(), anyhow::Error> {
+    fn stop(
+        &mut self,
+        timestamp: TimeStamp,
+        track_id: &TrackId,
+        car_id: Option<&CarId>,
+    ) -> Result<(), anyhow::Error> {
         let track = self.get_track(track_id)?;
         track.stop(timestamp, car_id.cloned())?;
         Ok(())
     }
 
     fn get_track<'a>(&'a mut self, track_id: &TrackId) -> Result<&'a mut Track, anyhow::Error> {
-        self.tracks.get_mut(track_id).ok_or(AppError::NoSuchTrack.into())
+        self.tracks
+            .get_mut(track_id)
+            .ok_or(AppError::NoSuchTrack.into())
     }
 }
 
@@ -454,7 +469,9 @@ impl Replayable for Competition {
                 self.register_next_car(track_id, car_id.clone())
             }
             CompetitionEventKind::Start { track_id } => self.start(event.time_stamp, track_id),
-            CompetitionEventKind::Stop { track_id, car_id } => self.stop(event.time_stamp, track_id, car_id.as_ref()),
+            CompetitionEventKind::Stop { track_id, car_id } => {
+                self.stop(event.time_stamp, track_id, car_id.as_ref())
+            }
         }
     }
 }
@@ -495,6 +512,18 @@ where
         Ok(())
     }
 
+    fn get_current_tracks(&mut self) -> Result<Vec<String>, anyhow::Error> {
+        let competition: &mut Replayer<Competition, F> = MayHave::get(self)?;
+
+        Ok(competition
+            .get()
+            .tracks
+            .iter()
+            .map(|track| track.0.get().to_owned())
+            .collect::<Vec<String>>()
+        )
+    }
+
     fn get_registered_next_car(&mut self, track_id: &str) -> Result<Option<String>, anyhow::Error> {
         let competition: &mut Replayer<Competition, F> = MayHave::get(self)?;
 
@@ -520,13 +549,18 @@ where
         Ok(())
     }
 
-    fn stop(&mut self, time_stamp: i64, track_id: &str, car_id: Option<&CarId>) -> Result<(), anyhow::Error> {
+    fn stop(
+        &mut self,
+        time_stamp: i64,
+        track_id: &str,
+        car_id: Option<&CarId>,
+    ) -> Result<(), anyhow::Error> {
         let competition: &mut Replayer<Competition, F> = MayHave::get(self)?;
         competition.command(CompetitionEvent::new(
             time_stamp_from_unixmsec(time_stamp)?,
             CompetitionEventKind::Stop {
                 track_id: TrackId::new(track_id),
-                car_id: car_id.cloned()
+                car_id: car_id.cloned(),
             },
         ));
 
@@ -562,7 +596,7 @@ impl CompetitionConfiguration {
 trait CompetitionConfigurationRepository {
     async fn competition_configuration(
         &mut self,
-        config_id: &CompetitionConfigurationId
+        config_id: &CompetitionConfigurationId,
     ) -> Result<Option<CompetitionConfiguration>, anyhow::Error>;
 }
 
@@ -570,7 +604,10 @@ struct MockCompetitionConfigurationRepository(CompetitionConfiguration);
 
 #[tonic::async_trait]
 impl CompetitionConfigurationRepository for MockCompetitionConfigurationRepository {
-    async fn competition_configuration(&mut self, cofig_id: &CompetitionConfigurationId) -> Result<Option<CompetitionConfiguration>> {
+    async fn competition_configuration(
+        &mut self,
+        cofig_id: &CompetitionConfigurationId,
+    ) -> Result<Option<CompetitionConfiguration>> {
         Ok(Some(self.0.clone()))
     }
 }

@@ -1,5 +1,8 @@
 syntax = "proto3";
+
 package timingsystem;
+
+import "google/protobuf/wrappers.proto";
 
 service TimingSystem {
     rpc CreateCompetition (CreateCompetitionRequest) returns(CommandReply) {}
@@ -7,6 +10,7 @@ service TimingSystem {
     rpc Start (StartRequest) returns (CommandReply) {}
     rpc Stop (StopRequest) returns (CommandReply) {}
 
+    rpc GetCurrentTracks (GetCurrentTracksRequest) returns (GetCurrentTracksReply) {}
     rpc GetRegisteredNextCar (GetRegisteredNextCarRequest) returns (GetRegisteredNextCarReply) {}
     rpc SubscribeStateChange (SubscribeStateChangeRequest) returns(stream SubscribeStateChangeReply) {}
 }
@@ -17,7 +21,7 @@ message CommandReply {
 
 message CreateCompetitionRequest {
     int64 timestamp = 2;
-    string overlapLimit = 1;
+    string competitionConfigurationId = 1;
 }
 
 message RegisterNextCarRequest {
@@ -29,13 +33,21 @@ message RegisterNextCarRequest {
 message StartRequest {
     int64 timestamp = 3;
     string trackId = 1;
-    optional string carId = 2;
+    google.protobuf.StringValue carId = 2;
 }
 
 message StopRequest {
     int64 timestamp = 3;
     string trackId = 1;
-    optional string carId = 2;
+    google.protobuf.StringValue carId = 2;
+}
+
+message GetCurrentTracksRequest {
+    
+}
+
+message GetCurrentTracksReply {
+    repeated string trackId = 1;
 }
 
 message GetRegisteredNextCarRequest {
@@ -43,7 +55,7 @@ message GetRegisteredNextCarRequest {
 }
 
 message GetRegisteredNextCarReply {
-    optional string carId = 1;
+    google.protobuf.StringValue carId = 1;
 }
 
 message SubscribeStateChangeRequest {
