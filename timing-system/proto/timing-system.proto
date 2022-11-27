@@ -4,7 +4,11 @@ package timingsystem;
 service TimingSystem {
     rpc CreateCompetition (CreateCompetitionRequest) returns(CommandReply) {}
     rpc RegisterNextCar (RegisterNextCarRequest) returns (CommandReply) {}
+    rpc Start (StartRequest) returns (CommandReply) {}
+    rpc Stop (StopRequest) returns (CommandReply) {}
+
     rpc GetRegisteredNextCar (GetRegisteredNextCarRequest) returns (GetRegisteredNextCarReply) {}
+    rpc SubscribeStateChange (SubscribeStateChangeRequest) returns(stream SubscribeStateChangeReply) {}
 }
 
 message CommandReply {
@@ -12,12 +16,26 @@ message CommandReply {
 }
 
 message CreateCompetitionRequest {
+    int64 timestamp = 2;
     string overlapLimit = 1;
 }
 
 message RegisterNextCarRequest {
+    int64 timestamp = 3;
     string carId = 1;
     string trackId = 2;
+}
+
+message StartRequest {
+    int64 timestamp = 3;
+    string trackId = 1;
+    optional string carId = 2;
+}
+
+message StopRequest {
+    int64 timestamp = 3;
+    string trackId = 1;
+    optional string carId = 2;
 }
 
 message GetRegisteredNextCarRequest {
@@ -25,5 +43,13 @@ message GetRegisteredNextCarRequest {
 }
 
 message GetRegisteredNextCarReply {
-    string carId = 1;
+    optional string carId = 1;
+}
+
+message SubscribeStateChangeRequest {
+    
+}
+
+message SubscribeStateChangeReply {
+    
 }

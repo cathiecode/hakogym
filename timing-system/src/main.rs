@@ -1,11 +1,13 @@
 mod server;
 
-use std::{collections::{HashMap, HashSet, VecDeque}, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet, VecDeque},
+    sync::Arc,
+};
 
 use anyhow::Result;
 
 use chrono::{TimeZone, Utc};
-use prost_types::Timestamp;
 use thiserror::Error;
 
 type Duration = chrono::Duration;
@@ -155,6 +157,8 @@ enum AppError {
     NoSuchTrack,
     #[error("Competition did not configured")]
     CompetitionHaveNotConfigured,
+    #[error("Competition configuration did not found")]
+    CopmetitionConfigurationDidNotFound,
     #[error("Some assertion failed; application logic may wrong")]
     LogicError,
 }
@@ -222,8 +226,8 @@ struct CarId {
 }
 
 impl CarId {
-    fn new(id: String) -> Self {
-        Self { id }
+    fn new(id: &str) -> Self {
+        Self { id: id.to_owned() }
     }
     fn get(&self) -> &str {
         &self.id
@@ -236,8 +240,22 @@ struct TrackId {
 }
 
 impl TrackId {
-    fn new(id: String) -> Self {
-        Self { id }
+    fn new(id: &str) -> Self {
+        Self { id: id.to_owned() }
+    }
+    fn get(&self) -> &str {
+        &self.id
+    }
+}
+
+#[derive(Clone, Eq, PartialEq, Hash)]
+struct CompetitionConfigurationId {
+    id: String,
+}
+
+impl CompetitionConfigurationId {
+    fn new(id: &str) -> Self {
+        Self { id: id.to_owned() }
     }
     fn get(&self) -> &str {
         &self.id
@@ -313,7 +331,7 @@ impl Track {
         }
     }
 
-    pub fn goal(&mut self, date: TimeStamp, car_id: Option<CarId>) -> Result<TimeResult> {
+    pub fn stop(&mut self, date: TimeStamp, car_id: Option<CarId>) -> Result<TimeResult> {
         let (car_index, car) = if let Some(car_id) = car_id {
             self.find_running_car(&car_id)?
         } else {
@@ -372,7 +390,7 @@ struct Competition {
 enum CompetitionEventKind {
     RegisterNextCar { track_id: TrackId, car_id: CarId },
     Start { track_id: TrackId },
-    Stop { track_id: TrackId },
+    Stop { track_id: TrackId, car_id: Option<CarId> },
 }
 
 struct CompetitionEvent {
@@ -404,9 +422,25 @@ impl Competition {
         track_id: &TrackId,
         car_id: CarId,
     ) -> Result<(), anyhow::Error> {
-        let track = self.tracks.get_mut(track_id).ok_or(AppError::NoSuchTrack)?;
-        track.register_next_car(car_id.clone());
+        let track = self.get_track(track_id)?;
+        track.register_next_car(car_id.clone())?;
         Ok(())
+    }
+
+    fn start(&mut self, timestamp: TimeStamp, track_id: &TrackId) -> Result<(), anyhow::Error> {
+        let track = self.get_track(track_id)?;
+        track.start(timestamp)?;
+        Ok(())
+    }
+
+    fn stop(&mut self, timestamp: TimeStamp, track_id: &TrackId, car_id: Option<&CarId>) -> Result<(), anyhow::Error> {
+        let track = self.get_track(track_id)?;
+        track.stop(timestamp, car_id.cloned())?;
+        Ok(())
+    }
+
+    fn get_track<'a>(&'a mut self, track_id: &TrackId) -> Result<&'a mut Track, anyhow::Error> {
+        self.tracks.get_mut(track_id).ok_or(AppError::NoSuchTrack.into())
     }
 }
 
@@ -419,8 +453,8 @@ impl Replayable for Competition {
             CompetitionEventKind::RegisterNextCar { track_id, car_id } => {
                 self.register_next_car(track_id, car_id.clone())
             }
-            CompetitionEventKind::Start { track_id } => todo!(),
-            CompetitionEventKind::Stop { track_id } => todo!(),
+            CompetitionEventKind::Start { track_id } => self.start(event.time_stamp, track_id),
+            CompetitionEventKind::Stop { track_id, car_id } => self.stop(event.time_stamp, track_id, car_id.as_ref()),
         }
     }
 }
@@ -453,12 +487,25 @@ where
         competition.command(CompetitionEvent {
             time_stamp: time_stamp_from_unixmsec(time_stamp)?,
             kind: CompetitionEventKind::RegisterNextCar {
-                track_id: TrackId::new(track_id.to_string()),
-                car_id: CarId::new(car_id.to_string()),
+                track_id: TrackId::new(track_id),
+                car_id: CarId::new(car_id),
             },
         });
 
         Ok(())
+    }
+
+    fn get_registered_next_car(&mut self, track_id: &str) -> Result<Option<String>, anyhow::Error> {
+        let competition: &mut Replayer<Competition, F> = MayHave::get(self)?;
+
+        Ok(competition
+            .get()
+            .tracks
+            .get(&TrackId::new(track_id))
+            .ok_or(AppError::NoSuchTrack)?
+            .pending_car
+            .as_ref()
+            .map(|car| car.getId().get().to_owned()))
     }
 
     fn start(&mut self, time_stamp: i64, track_id: &str) -> Result<(), anyhow::Error> {
@@ -466,19 +513,20 @@ where
         competition.command(CompetitionEvent::new(
             time_stamp_from_unixmsec(time_stamp)?,
             CompetitionEventKind::Start {
-                track_id: TrackId::new(track_id.to_string()),
+                track_id: TrackId::new(track_id),
             },
         ));
 
         Ok(())
     }
 
-    fn stop(&mut self, time_stamp: i64, track_id: &str) -> Result<(), anyhow::Error> {
+    fn stop(&mut self, time_stamp: i64, track_id: &str, car_id: Option<&CarId>) -> Result<(), anyhow::Error> {
         let competition: &mut Replayer<Competition, F> = MayHave::get(self)?;
         competition.command(CompetitionEvent::new(
             time_stamp_from_unixmsec(time_stamp)?,
-            CompetitionEventKind::Start {
-                track_id: TrackId::new(track_id.to_string()),
+            CompetitionEventKind::Stop {
+                track_id: TrackId::new(track_id),
+                car_id: car_id.cloned()
             },
         ));
 
@@ -486,10 +534,12 @@ where
     }
 }
 
+#[derive(Clone)]
 struct CompetitionConfiguration {
     tracks: HashMap<String, CompetitionConfigurationTrack>,
 }
 
+#[derive(Clone)]
 struct CompetitionConfigurationTrack {
     overlap_limit: i64,
 }
@@ -508,31 +558,73 @@ impl CompetitionConfiguration {
     }
 }
 
-struct TimingSystemApp
-{
-    competition: Option<Replayer<Competition, Box<dyn Fn() -> Competition + Sync + Send>>>,
+#[tonic::async_trait]
+trait CompetitionConfigurationRepository {
+    async fn competition_configuration(
+        &mut self,
+        config_id: &CompetitionConfigurationId
+    ) -> Result<Option<CompetitionConfiguration>, anyhow::Error>;
 }
 
-impl TimingSystemApp {
-    fn create_competition(
+struct MockCompetitionConfigurationRepository(CompetitionConfiguration);
+
+#[tonic::async_trait]
+impl CompetitionConfigurationRepository for MockCompetitionConfigurationRepository {
+    async fn competition_configuration(&mut self, cofig_id: &CompetitionConfigurationId) -> Result<Option<CompetitionConfiguration>> {
+        Ok(Some(self.0.clone()))
+    }
+}
+
+struct TimingSystemApp<T>
+where
+    T: CompetitionConfigurationRepository + Sync + Send,
+{
+    competition: Option<Replayer<Competition, Box<dyn Fn() -> Competition + Sync + Send>>>,
+    competition_configuration_repository: T,
+}
+
+impl<T> TimingSystemApp<T>
+where
+    T: CompetitionConfigurationRepository + Sync + Send,
+{
+    // TODO:
+    async fn create_competition(
         &mut self,
-        config: CompetitionConfiguration,
+        config_id: CompetitionConfigurationId,
     ) -> Result<(), anyhow::Error> {
+        let config = self
+            .competition_configuration_repository
+            .competition_configuration(&config_id)
+            .await?
+            .ok_or(AppError::CopmetitionConfigurationDidNotFound)?;
         self.competition = Some(Replayer::new(Box::new(move || config.build_competition())));
 
         Ok(())
     }
 }
 
-impl MayHave<Replayer<Competition, Box<dyn Fn() -> Competition + Sync + Send>>> for TimingSystemApp {
-    fn get(&mut self) -> Result<&mut Replayer<Competition, Box<dyn Fn() -> Competition + Sync + Send>>, anyhow::Error> {
-        Ok(self.competition.as_mut().ok_or(AppError::CompetitionHaveNotConfigured)?)
+impl<T> MayHave<Replayer<Competition, Box<dyn Fn() -> Competition + Sync + Send>>>
+    for TimingSystemApp<T>
+where
+    T: CompetitionConfigurationRepository + Sync + Send,
+{
+    fn get(
+        &mut self,
+    ) -> Result<&mut Replayer<Competition, Box<dyn Fn() -> Competition + Sync + Send>>, anyhow::Error>
+    {
+        Ok(self
+            .competition
+            .as_mut()
+            .ok_or(AppError::CompetitionHaveNotConfigured)?)
     }
 }
 
-impl CompetitionService<Box<dyn Fn() -> Competition + Sync + Send>> for TimingSystemApp {}
+impl<T> CompetitionService<Box<dyn Fn() -> Competition + Sync + Send>> for TimingSystemApp<T> where
+    T: CompetitionConfigurationRepository + Sync + Send
+{
+}
 
 #[tokio::main]
 async fn main() {
-    server::run().await;
+    server::run().await.unwrap();
 }
