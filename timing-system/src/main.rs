@@ -448,7 +448,8 @@ impl Competition {
         car_id: Option<&CarId>,
     ) -> Result<(), anyhow::Error> {
         let track = self.get_track(track_id)?;
-        track.stop(timestamp, car_id.cloned())?;
+        let result = track.stop(timestamp, car_id.cloned())?;
+        self.results.push(result);
         Ok(())
     }
 
@@ -490,9 +491,9 @@ fn time_stamp_from_unixmsec(unixmsec: i64) -> Result<TimeStamp, anyhow::Error> {
     Ok(Utc.timestamp(unixmsec / 1000, redundunt_nsec))
 }
 
-trait CompetitionService<F>: MayHave<Replayer<Competition, F>>
+trait CompetitionService<'a, F>: MayHave<Replayer<Competition, F>>
 where
-    F: Fn() -> Competition,
+    F: Fn() -> Competition + 'a,
 {
     fn register_next_car(
         &mut self,
@@ -520,8 +521,7 @@ where
             .tracks
             .iter()
             .map(|track| track.0.get().to_owned())
-            .collect::<Vec<String>>()
-        )
+            .collect::<Vec<String>>())
     }
 
     fn get_registered_next_car(&mut self, track_id: &str) -> Result<Option<String>, anyhow::Error> {
@@ -565,6 +565,12 @@ where
         ));
 
         Ok(())
+    }
+
+    fn get_results(&'a mut self) -> Result<&'a [TimeResult], anyhow::Error> {
+        let competition: &mut Replayer<Competition, F> = MayHave::get(self)?;
+
+        Ok(competition.get().results.as_slice())
     }
 }
 
@@ -656,7 +662,7 @@ where
     }
 }
 
-impl<T> CompetitionService<Box<dyn Fn() -> Competition + Sync + Send>> for TimingSystemApp<T> where
+impl<T> CompetitionService<'_, Box<dyn Fn() -> Competition + Sync + Send>> for TimingSystemApp<T> where
     T: CompetitionConfigurationRepository + Sync + Send
 {
 }

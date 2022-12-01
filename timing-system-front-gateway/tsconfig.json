@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "noEmit": true,
     "allowJs": true,
     "target": "ES2022",
     "module": "ESNext",
@@ -17,7 +18,7 @@
     "noUnusedParameters": true,
     "noImplicitAny": false,
     "noImplicitThis": false,
-    "strictNullChecks": true
+    "strictNullChecks": true,
   },
   "include": ["src/**/*", "__tests__/**/*"]
 }

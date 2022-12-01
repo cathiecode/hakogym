@@ -10,6 +10,7 @@ service TimingSystem {
     rpc Start (StartRequest) returns (CommandReply) {}
     rpc Stop (StopRequest) returns (CommandReply) {}
 
+    rpc GetResults (GetResultsRequest) returns (GetResultsReply) {}
     rpc GetCurrentTracks (GetCurrentTracksRequest) returns (GetCurrentTracksReply) {}
     rpc GetRegisteredNextCar (GetRegisteredNextCarRequest) returns (GetRegisteredNextCarReply) {}
     rpc SubscribeStateChange (SubscribeStateChangeRequest) returns(stream SubscribeStateChangeReply) {}
@@ -56,6 +57,19 @@ message GetRegisteredNextCarRequest {
 
 message GetRegisteredNextCarReply {
     google.protobuf.StringValue carId = 1;
+}
+
+message GetResultsRequest {
+    
+}
+
+message GetResultsReply {
+    repeated TimeResult results = 1;
+}
+
+message TimeResult {
+    string carId = 1;
+    uint64 time = 2;
 }
 
 message SubscribeStateChangeRequest {

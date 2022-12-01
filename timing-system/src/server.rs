@@ -14,7 +14,9 @@ use crate::{
     MockCompetitionConfigurationRepository, TimingSystemApp,
 };
 
-use self::proto::{CommandReply, GetRegisteredNextCarReply, SubscribeStateChangeReply, GetCurrentTracksReply};
+use self::proto::{
+    CommandReply, GetCurrentTracksReply, GetRegisteredNextCarReply, SubscribeStateChangeReply,
+};
 
 pub mod proto {
     tonic::include_proto!("timingsystem");
@@ -72,7 +74,9 @@ impl TimingSystem for TimingSystemAppController {
         self.competition
             .lock()
             .await
-            .create_competition(CompetitionConfigurationId::new(&params.competition_configuration_id))
+            .create_competition(CompetitionConfigurationId::new(
+                &params.competition_configuration_id,
+            ))
             .await
             .map_err(|e| Status::failed_precondition(e.to_string()))?;
         self.notify_change().await?;
@@ -138,11 +142,8 @@ impl TimingSystem for TimingSystemAppController {
             .await
             .get_current_tracks()
             .map_err(|e| Status::failed_precondition(e.to_string()))?;
-        Ok(Response::new(GetCurrentTracksReply {
-            track_id
-        }))
+        Ok(Response::new(GetCurrentTracksReply { track_id }))
     }
-
 
     async fn get_registered_next_car(
         &self,
@@ -155,8 +156,27 @@ impl TimingSystem for TimingSystemAppController {
             .get_registered_next_car(&request.get_ref().track_id)
             .map_err(|e| Status::failed_precondition(e.to_string()))?;
         Ok(Response::new(GetRegisteredNextCarReply {
-            //car_id: registered_next_car,
-            car_id: None,
+            car_id: registered_next_car,
+        }))
+    }
+
+    async fn get_results(
+        &self,
+        _: Request<proto::GetResultsRequest>,
+    ) -> Result<Response<proto::GetResultsReply>, Status> {
+        Ok(Response::new(proto::GetResultsReply {
+            results: self
+                .competition
+                .lock()
+                .await
+                .get_results()
+                .map_err(|e| Status::failed_precondition(e.to_string()))?
+                .iter()
+                .map(|result| proto::TimeResult {
+                    car_id: result.get_car_id().get().to_owned(),
+                    time: result.get_duration().num_milliseconds().abs() as u64,
+                })
+                .collect(),
         }))
     }
 
