@@ -7,10 +7,10 @@ import fastifyApollo, {
   fastifyApolloDrainPlugin,
 } from "@as-integrations/fastify";
 import fastifyIO from "fastify-socket.io";
+import fastifySensible from "@fastify/sensible";
 
 export async function main(): Promise<void> {
   const app = fastify();
-  const server = new Server(app);
 
   app.ready().then(() => {
     connection.subscribeChange(() => {
@@ -29,7 +29,9 @@ export async function main(): Promise<void> {
   await app.register(fastifyApollo(graphQlServer));
   await app.register(fastifyIO);
 
-  server.listen(process.env.PORT ?? 8080);
+  app.listen({
+    port: parseInt(process.env.PORT ?? "8080"),
+  });
 }
 
 main().catch((e) => {

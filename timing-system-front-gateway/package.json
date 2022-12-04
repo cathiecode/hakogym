@@ -40,6 +40,7 @@
   "dependencies": {
     "@apollo/server": "^4.2.1",
     "@as-integrations/fastify": "^1.2.0",
+    "@fastify/sensible": "^5.1.1",
     "@grpc/grpc-js": "^1.7.3",
     "@grpc/proto-loader": "^0.7.3",
     "cors": "^2.8.5",
@@ -47,6 +48,7 @@
     "fastify": "^4.10.2",
     "fastify-socket.io": "^4.0.0",
     "socket.io": "^4.5.4",
-    "tslib": "~2.4"
+    "tslib": "~2.4",
+    "zod": "^3.19.1"
   }
 }

@@ -1,16 +1,30 @@
-import { Router } from "express";
+import { FastifyInstance } from "fastify";
+import { z } from "zod";
 import { connection } from "./connection";
 import { CreateCompetitionRequest } from "./proto/timing-system_pb";
 import { promisify } from "./utils";
 
-const commandRoute = Router();
+export default async function commandRoutes(
+  fastify: FastifyInstance,
+  options: object
+) {
+  {
+    const RequestType = z.object({
+      configurationId: z.string()
+    });
+    fastify.get("/", async (request, reply) => {
+      const requestBody = RequestType.safeParse(request.body);
+      if (!requestBody.success) {
+        throw 
+      }
 
-commandRoute.get("/competition", (req) => {
-  const request = new CreateCompetitionRequest();
-  request.setCompetitionconfigurationid(req.body.configurationId);
-  await promisify(cb => connection.client.createCompetition(request, cb));
-})
-
-commandRoute.get("/competition")
-
-export default commandRoute;
+      const backendRequest = new CreateCompetitionRequest();
+      backendRequest.setCompetitionconfigurationid(
+        reply.bad
+      );
+      await promisify((cb) =>
+        connection.client.createCompetition(backendRequest, cb)
+      );
+    });
+  }
+}

@@ -1,8 +1,7 @@
 mod server;
 
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
-    sync::Arc,
+    collections::{HashMap, VecDeque}
 };
 
 use anyhow::Result;
@@ -207,7 +206,7 @@ impl Timer {
     }
 
     fn set_time(&mut self, time: Duration) -> Result<()> {
-        self.state = TimerState::Specified { time: time };
+        self.state = TimerState::Specified { time };
         Ok(())
     }
 
@@ -291,7 +290,7 @@ impl RunningCar {
         self.timer.set_time(time)
     }*/
 
-    fn getId(&self) -> &CarId {
+    fn get_id(&self) -> &CarId {
         &self.id
     }
 }
@@ -350,7 +349,7 @@ impl Track {
 
         Ok(TimeResult {
             duration: car.time(date)?,
-            car_id: car.getId().clone(),
+            car_id: car.get_id().clone(),
         })
     }
 
@@ -358,7 +357,7 @@ impl Track {
         if let Some(index) = self
             .running_cars
             .iter()
-            .position(|car| car.getId() == car_id)
+            .position(|car| car.get_id() == car_id)
         {
             Ok((index, self.running_cars.get_mut(index).unwrap()))
         } else {
@@ -534,7 +533,7 @@ where
             .ok_or(AppError::NoSuchTrack)?
             .pending_car
             .as_ref()
-            .map(|car| car.getId().get().to_owned()))
+            .map(|car| car.get_id().get().to_owned()))
     }
 
     fn start(&mut self, time_stamp: i64, track_id: &str) -> Result<(), anyhow::Error> {
@@ -612,7 +611,7 @@ struct MockCompetitionConfigurationRepository(CompetitionConfiguration);
 impl CompetitionConfigurationRepository for MockCompetitionConfigurationRepository {
     async fn competition_configuration(
         &mut self,
-        cofig_id: &CompetitionConfigurationId,
+        _cofig_id: &CompetitionConfigurationId,
     ) -> Result<Option<CompetitionConfiguration>> {
         Ok(Some(self.0.clone()))
     }
