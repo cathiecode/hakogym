@@ -60,6 +60,7 @@ impl TimingSystemAppController {
         self.change_watcher_sender
             .send(())
             .map_err(|_| Status::internal("Internal error (subscription send)"))?;
+        println!("change sent!");
         Ok(())
     }
 }
@@ -191,6 +192,7 @@ impl TimingSystem for TimingSystemAppController {
         let mut receiver = self.change_watcher_receiver.clone();
         tokio::spawn(async move {
             while receiver.changed().await.is_ok() {
+                println!("change received!");
                 match tx
                     .send(Result::<_, Status>::Ok(SubscribeStateChangeReply {}))
                     .await
@@ -211,6 +213,16 @@ impl TimingSystem for TimingSystemAppController {
         Ok(Response::new(
             Box::pin(out_stream) as Self::SubscribeStateChangeStream
         ))
+    }
+
+    async fn get_state_tree(&self, _: Request<proto::GetStateTreeRequest>) -> Result<Response<proto::GetStateTreeReply>, Status> {
+        let state_tree = self.competition.lock().await.get_state_tree().map_err(|error| {
+            Status::internal(error.to_string())
+        })?;
+        println!("{}", state_tree);
+        Ok(Response::new(proto::GetStateTreeReply {
+            state: state_tree
+        }))
     }
 }
 

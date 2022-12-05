@@ -1,13 +1,16 @@
 mod server;
 
-use std::{
-    collections::{HashMap, VecDeque}
-};
+use std::{collections::{HashMap, VecDeque}, error};
 
 use anyhow::Result;
 
 use chrono::{TimeZone, Utc};
+use serde::{
+    ser::{SerializeStruct, SerializeStructVariant},
+    Serialize,
+};
 use thiserror::Error;
+use tonic::codegen::Body;
 
 type Duration = chrono::Duration;
 type TimeStamp = chrono::DateTime<chrono::Utc>;
@@ -132,6 +135,7 @@ impl<Model: Replayable, T> AsRef<Model> for Replayer<Model, T> {
     }
 }
 
+#[derive(Serialize)]
 struct Timer {
     /*start_date: Option<TimeStamp>,
     time: Option<Duration>,*/
@@ -167,6 +171,34 @@ enum TimerState {
     Started { start_date: TimeStamp },
     Stopped { time: Duration },
     Specified { time: Duration },
+}
+
+impl Serialize for TimerState {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            TimerState::HaveNotStarted => serializer
+                .serialize_struct_variant("TimerState", 0, "HaveNotStarted", 0)?
+                .end(),
+            TimerState::Started { start_date } => {
+                let mut state = serializer.serialize_struct_variant("TimerState", 1, "Started", 1)?;
+                state.serialize_field("start_date", &start_date.timestamp_millis())?;
+                state.end()
+            },
+            TimerState::Stopped { time } => {
+                let mut state = serializer.serialize_struct_variant("TimerState", 2, "Stopped", 1)?;
+                state.serialize_field("time", &time.num_milliseconds())?;
+                state.end()
+            },
+            TimerState::Specified { time } => {
+                let mut state = serializer.serialize_struct_variant("TimerState", 3, "Started", 1)?;
+                state.serialize_field("time", &time.num_milliseconds())?;
+                state.end()
+            },
+        }
+    }
 }
 
 impl Timer {
@@ -219,7 +251,7 @@ impl Timer {
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Hash)]
+#[derive(Clone, Eq, PartialEq, Hash, Serialize)]
 struct CarId {
     id: String,
 }
@@ -236,6 +268,14 @@ impl CarId {
 #[derive(Clone, Eq, PartialEq, Hash)]
 struct TrackId {
     id: String,
+}
+
+impl Serialize for TrackId {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer {
+        serializer.serialize_str(&self.id)
+    }
 }
 
 impl TrackId {
@@ -261,6 +301,7 @@ impl CompetitionConfigurationId {
     }
 }
 
+#[derive(Serialize)]
 struct RunningCar {
     timer: Timer,
     id: CarId,
@@ -295,6 +336,7 @@ impl RunningCar {
     }
 }
 
+#[derive(Serialize)]
 struct Track {
     running_cars: VecDeque<RunningCar>,
     pending_car: Option<RunningCar>,
@@ -381,6 +423,19 @@ impl TimeResult {
     }
 }
 
+impl Serialize for TimeResult {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut state = serializer.serialize_struct("TimeResult", 2)?;
+        state.serialize_field("duration", &self.duration.num_milliseconds())?;
+        state.serialize_field("car_id", &self.car_id)?;
+        state.end()
+    }
+}
+
+#[derive(Serialize)]
 struct Competition {
     results: Vec<TimeResult>,
     tracks: HashMap<TrackId, Track>,
@@ -484,11 +539,15 @@ trait MayHave<T> {
     fn get(&mut self) -> Result<&mut T, anyhow::Error>;
 }
 
-fn time_stamp_from_unixmsec(unixmsec: i64) -> Result<TimeStamp, anyhow::Error> {
+fn time_stamp_from_unixmsec(unixmsec: u64) -> Result<TimeStamp, anyhow::Error> {
     let redundunt_nsec = u32::try_from(unixmsec)? % 1000;
 
-    Ok(Utc.timestamp(unixmsec / 1000, redundunt_nsec))
+    Utc.timestamp_opt((unixmsec / 1000) as i64, redundunt_nsec)
+        .single()
+        .ok_or(AppError::LogicError.into())
 }
+
+struct TrackStateDTO {}
 
 trait CompetitionService<'a, F>: MayHave<Replayer<Competition, F>>
 where
@@ -496,7 +555,7 @@ where
 {
     fn register_next_car(
         &mut self,
-        time_stamp: i64,
+        time_stamp: u64,
         track_id: &str,
         car_id: &str,
     ) -> Result<(), anyhow::Error> {
@@ -536,7 +595,7 @@ where
             .map(|car| car.get_id().get().to_owned()))
     }
 
-    fn start(&mut self, time_stamp: i64, track_id: &str) -> Result<(), anyhow::Error> {
+    fn start(&mut self, time_stamp: u64, track_id: &str) -> Result<(), anyhow::Error> {
         let competition: &mut Replayer<Competition, F> = MayHave::get(self)?;
         competition.command(CompetitionEvent::new(
             time_stamp_from_unixmsec(time_stamp)?,
@@ -550,7 +609,7 @@ where
 
     fn stop(
         &mut self,
-        time_stamp: i64,
+        time_stamp: u64,
         track_id: &str,
         car_id: Option<&CarId>,
     ) -> Result<(), anyhow::Error> {
@@ -570,6 +629,11 @@ where
         let competition: &mut Replayer<Competition, F> = MayHave::get(self)?;
 
         Ok(competition.get().results.as_slice())
+    }
+
+    fn get_state_tree(&mut self) -> Result<String, anyhow::Error> {
+        let competition: &mut Replayer<Competition, F> = MayHave::get(self)?;
+        Ok(serde_json::to_string(competition.get()).unwrap_or_else(|error| error.to_string()))
     }
 }
 
