@@ -1,0 +1,14 @@
+@import "water.css";
+
+.App {
+  -webkit-user-select: none;
+}
+
+.columns {
+  display: flex;
+  justify-content: space-between;
+}
+
+.App td, .App th {
+  vertical-align: middle;
+}

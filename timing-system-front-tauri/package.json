@@ -15,7 +15,11 @@
     "@tanstack/react-query": "^4.19.1",
     "@tauri-apps/api": "^1.1.0",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "react-error-boundary": "^3.1.4",
+    "react-hot-toast": "^2.4.0",
+    "usehooks-ts": "^2.9.1",
+    "water.css": "^2.1.1"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^1.2.1",

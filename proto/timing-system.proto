@@ -35,7 +35,6 @@ message RegisterNextCarRequest {
 message StartRequest {
     uint64 timestamp = 3;
     string trackId = 1;
-    google.protobuf.StringValue carId = 2;
 }
 
 message StopRequest {
@@ -86,5 +85,5 @@ message SubscribeStateChangeRequest {
 }
 
 message SubscribeStateChangeReply {
-    
+    string state = 1;
 }

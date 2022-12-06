@@ -1,58 +1,134 @@
-import reactLogo from "./assets/react.svg";
-import { invoke } from "@tauri-apps/api/tauri";
-import { listen } from "@tauri-apps/api/event";
-import "./App.css";
-import { useAppState } from "./store";
-import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useStateTree } from "./store";
+import Loader from "./components/Loader";
+import { useRef } from "react";
+import { createCompetition, registerNextCar, start, stop } from "./command";
+import Timer from "./components/Timer";
+import {Toaster} from "react-hot-toast";
+
+import styles from "./App.module.css";
 
 function App() {
-  async function createCompetition() {
-    // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
+  const stateTree = useStateTree();
 
-    console.log(
-      await invoke("create_competition", { configurationId: "test" })
-    );
-  }
-
-  const state_tree = useAppState<string>("get_state_tree", {});
-
-  const queryClient = useQueryClient();
-
-  useEffect(() => {
-    listen("state_changed", () => {
-      queryClient.invalidateQueries();
-    })
-  }, []);
+  const registerPendingCarInput = useRef<HTMLInputElement>(null);
 
   return (
-    <div className="container">
-      <h1>Welcome to Tauri!</h1>
+    <div className={styles.App}>
+      <Toaster />
+      <Loader data={stateTree.data}>
+        {(data) => (
+          <div className={styles.columns}>
+            <div>
+              {Object.entries(data.tracks).map(([trackId, track]) => (
+                <div>
+                  <h2>トラック {trackId}</h2>
+                  <div>同時出走制限: {track.overwrap_limit}台</div>
+                  <div>
+                    <h3>待機中車両</h3>
+                    {track.pending_car !== null ? (
+                      <span>
+                        <div>ゼッケン #{track.pending_car.id}</div>
+                        <button
+                          onClick={() =>
+                            start({ timestamp: Date.now(), trackId })
+                          }
+                        >
+                          手動スタート
+                        </button>
+                      </span>
+                    ) : (
+                      <span>
+                        <input
+                          type="text"
+                          placeholder="ゼッケンID"
+                          ref={registerPendingCarInput}
+                        />
+                        <button
+                          onClick={() => {
+                            const carId =
+                              registerPendingCarInput.current?.value;
+                            if (!carId) {
+                              return;
+                            }
+                            registerNextCar({
+                              timestamp: Date.now(),
+                              carId: carId,
+                              trackId: trackId,
+                            });
+                          }}
+                        >
+                          待機中として登録
+                        </button>
+                      </span>
+                    )}
+                  </div>
 
-      <div className="row">
-        <a href="https://vitejs.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://reactjs.org" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-
-      <h2>State Tree</h2>
-      <pre>{state_tree.data}</pre>
-
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
-
-      <div className="row">
-        <div>
-          <button type="button" onClick={() => createCompetition()}>
-            Create world!
-          </button>
-        </div>
-      </div>
+                  <h3>出走中車両</h3>
+                  <table>
+                    <tbody>
+                      {track.running_cars.map((running_car) => (
+                        <tr>
+                          <th>#{running_car.id}</th>
+                          <td>
+                            <Timer timer={running_car.timer} />
+                          </td>
+                          <td>
+                            <button
+                              onClick={() =>
+                                stop({
+                                  timestamp: Date.now(),
+                                  trackId: trackId,
+                                  carId: running_car.id,
+                                })
+                              }
+                            >
+                              ゴール
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <button
+                    onClick={() =>
+                      stop({ timestamp: Date.now(), trackId: trackId })
+                    }
+                  >
+                    最終出走をゴール
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div>
+              <h2>リザルト(生データ)</h2>
+              <table>
+                <tbody>
+                  {}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </Loader>
+      <hr />
+      <details>
+        <summary>デバッグ</summary>
+        <h3>コマンド</h3>
+        <button
+          onClick={() =>
+            createCompetition({
+              configurationId:
+                "TODO/backend_does_nothing_according_to_this_value",
+            })
+          }
+        >
+          CreateCompetition
+        </button>
+        <h3>ステートツリー</h3>
+        <pre>
+          <code>{JSON.stringify(stateTree.data, null, "  ")}</code>
+        </pre>
+      </details>
     </div>
   );
 }

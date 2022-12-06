@@ -137,8 +137,6 @@ impl<Model: Replayable, T> AsRef<Model> for Replayer<Model, T> {
 
 #[derive(Serialize)]
 struct Timer {
-    /*start_date: Option<TimeStamp>,
-    time: Option<Duration>,*/
     state: TimerState,
 }
 
@@ -179,21 +177,26 @@ impl Serialize for TimerState {
         S: serde::Serializer,
     {
         match self {
-            TimerState::HaveNotStarted => serializer
-                .serialize_struct_variant("TimerState", 0, "HaveNotStarted", 0)?
-                .end(),
+            TimerState::HaveNotStarted => {
+                let mut state = serializer.serialize_struct("TimerState", 1)?;
+                state.serialize_field("type", "HaveNotStarted")?;
+                state.end()
+            },
             TimerState::Started { start_date } => {
-                let mut state = serializer.serialize_struct_variant("TimerState", 1, "Started", 1)?;
+                let mut state = serializer.serialize_struct("TimerState", 2)?;
+                state.serialize_field("type", "Started")?;
                 state.serialize_field("start_date", &start_date.timestamp_millis())?;
                 state.end()
             },
             TimerState::Stopped { time } => {
-                let mut state = serializer.serialize_struct_variant("TimerState", 2, "Stopped", 1)?;
+                let mut state = serializer.serialize_struct("TimerState", 2)?;
+                state.serialize_field("type", "Stopped")?;
                 state.serialize_field("time", &time.num_milliseconds())?;
                 state.end()
             },
             TimerState::Specified { time } => {
-                let mut state = serializer.serialize_struct_variant("TimerState", 3, "Started", 1)?;
+                let mut state = serializer.serialize_struct("TimerState", 2)?;
+                state.serialize_field("type", "Specified")?;
                 state.serialize_field("time", &time.num_milliseconds())?;
                 state.end()
             },
@@ -251,7 +254,7 @@ impl Timer {
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Hash, Serialize)]
+#[derive(Clone, Eq, PartialEq, Hash)]
 struct CarId {
     id: String,
 }
@@ -264,6 +267,15 @@ impl CarId {
         &self.id
     }
 }
+
+impl Serialize for CarId {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer {
+        serializer.serialize_str(&self.id)
+    }
+}
+
 
 #[derive(Clone, Eq, PartialEq, Hash)]
 struct TrackId {
@@ -540,7 +552,9 @@ trait MayHave<T> {
 }
 
 fn time_stamp_from_unixmsec(unixmsec: u64) -> Result<TimeStamp, anyhow::Error> {
-    let redundunt_nsec = u32::try_from(unixmsec)? % 1000;
+    println!("time-Stamp-from-unixmsec: {}", unixmsec);
+
+    let redundunt_nsec = (u64::try_from(unixmsec)? % 1000) as u32;
 
     Utc.timestamp_opt((unixmsec / 1000) as i64, redundunt_nsec)
         .single()

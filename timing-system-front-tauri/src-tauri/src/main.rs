@@ -38,7 +38,6 @@ fn get_current_timestamp() -> Result<u64, Box<dyn std::error::Error>> {
 
 #[tauri::command]
 async fn create_competition(configuration_id: &str) -> Result<(), String> {
-    println!("Creating competition...");
     let mut connection = get_connection().await?;
     let request = proto::CreateCompetitionRequest {
         competition_configuration_id: configuration_id.to_string(),
@@ -48,6 +47,50 @@ async fn create_competition(configuration_id: &str) -> Result<(), String> {
         .create_competition(request)
         .await
         .map_err(|error| "Something went wrong!")?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn register_next_car(timestamp: u64, car_id: String, track_id: String) -> Result<(), String> {
+    let mut connection = get_connection().await?;
+    let request = proto::RegisterNextCarRequest {
+        timestamp,
+        car_id,
+        track_id,
+    };
+    connection
+        .register_next_car(request)
+        .await
+        .map_err(|error| error.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn start(timestamp: u64, track_id: String) -> Result<(), String> {
+    let mut connection = get_connection().await?;
+    let request = proto::StartRequest {
+        timestamp,
+        track_id,
+    };
+    connection
+        .start(request)
+        .await
+        .map_err(|error| error.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn stop(timestamp: u64, track_id: String, car_id: Option<String>) -> Result<(), String> {
+    let mut connection = get_connection().await?;
+    let request = proto::StopRequest {
+        timestamp,
+        track_id,
+        car_id,
+    };
+    connection
+        .stop(request)
+        .await
+        .map_err(|error| error.to_string())?;
     Ok(())
 }
 
@@ -88,9 +131,10 @@ where
 
     println!("Connected. waiting for change...");
 
-    while let Some(message) = &subscription.message().await.ok() {
+    while let Some(message) = subscription.message().await.ok() {
         println!("state changed.");
-        manager.emit_all("state_changed", ());
+        let state = message.map_or("".to_owned(), |message| message.state);
+        manager.emit_all("state_changed", state);
     }
     Ok(())
 }
@@ -115,6 +159,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             create_competition,
             get_current_tracks,
             get_state_tree,
+            register_next_car,
+            start,
+            stop
         ))
         .run(tauri::generate_context!())?;
     Ok(())

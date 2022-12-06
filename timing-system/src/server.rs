@@ -188,13 +188,21 @@ impl TimingSystem for TimingSystemAppController {
         _: Request<proto::SubscribeStateChangeRequest>,
     ) -> Result<Response<Self::SubscribeStateChangeStream>, Status> {
         let (tx, rx) = mpsc::channel(128);
-
+        let competition = self.competition.clone();
         let mut receiver = self.change_watcher_receiver.clone();
         tokio::spawn(async move {
             while receiver.changed().await.is_ok() {
                 println!("change received!");
+                let state_tree = competition
+                    .lock()
+                    .await
+                    .get_state_tree()
+                    .unwrap_or("".to_owned());
+
                 match tx
-                    .send(Result::<_, Status>::Ok(SubscribeStateChangeReply {}))
+                    .send(Result::<_, Status>::Ok(SubscribeStateChangeReply {
+                        state: state_tree,
+                    }))
                     .await
                 {
                     Ok(_) => {
@@ -215,13 +223,19 @@ impl TimingSystem for TimingSystemAppController {
         ))
     }
 
-    async fn get_state_tree(&self, _: Request<proto::GetStateTreeRequest>) -> Result<Response<proto::GetStateTreeReply>, Status> {
-        let state_tree = self.competition.lock().await.get_state_tree().map_err(|error| {
-            Status::internal(error.to_string())
-        })?;
+    async fn get_state_tree(
+        &self,
+        _: Request<proto::GetStateTreeRequest>,
+    ) -> Result<Response<proto::GetStateTreeReply>, Status> {
+        let state_tree = self
+            .competition
+            .lock()
+            .await
+            .get_state_tree()
+            .map_err(|error| Status::internal(error.to_string()))?;
         println!("{}", state_tree);
         Ok(Response::new(proto::GetStateTreeReply {
-            state: state_tree
+            state: state_tree,
         }))
     }
 }
