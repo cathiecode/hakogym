@@ -31,13 +31,20 @@ export function useStateTree() {
 }
 
 export type TimerValue = {
-  "state": {
-    type: "HaveNotStarted"
-  } | {
-    type: "Started",
-    start_date: number
-  }
-}
+  state:
+    | {
+        type: "HaveNotStarted";
+      }
+    | {
+        type: "Started";
+        start_date: number;
+      }
+    | {
+        // TODO: その他のStateを実装
+        type: "";
+        time: number;
+      };
+};
 
 type RunningCar = {
   id: string,
@@ -47,9 +54,13 @@ type RunningCar = {
 type StateTree = {
   tracks: {
     [key: string]: {
-      running_cars: RunningCar[],
-      pending_car: RunningCar | null,
-      overwrap_limit: 2
-    }
-  }
-}
+      running_cars: RunningCar[];
+      pending_car: RunningCar | null;
+      overwrap_limit: 2;
+    };
+  };
+  results: {
+    duration: number;
+    car_id: string;
+  }[];
+};

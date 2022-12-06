@@ -6,6 +6,7 @@ import Timer from "./components/Timer";
 import {Toaster} from "react-hot-toast";
 
 import styles from "./App.module.css";
+import { formatTimeDuration } from "./utils";
 
 function App() {
   const stateTree = useStateTree();
@@ -24,7 +25,7 @@ function App() {
                   <h2>トラック {trackId}</h2>
                   <div>同時出走制限: {track.overwrap_limit}台</div>
                   <div>
-                    <h3>待機中車両</h3>
+                    <h3>出走待機中車両</h3>
                     {track.pending_car !== null ? (
                       <span>
                         <div>ゼッケン #{track.pending_car.id}</div>
@@ -40,7 +41,7 @@ function App() {
                       <span>
                         <input
                           type="text"
-                          placeholder="ゼッケンID"
+                          placeholder="ゼッケン #"
                           ref={registerPendingCarInput}
                         />
                         <button
@@ -65,6 +66,13 @@ function App() {
 
                   <h3>出走中車両</h3>
                   <table>
+                    <thead>
+                      <tr>
+                        <th>ゼッケン</th>
+                        <th>タイム</th>
+                        <th>操作</th>
+                      </tr>
+                    </thead>
                     <tbody>
                       {track.running_cars.map((running_car) => (
                         <tr>
@@ -89,12 +97,13 @@ function App() {
                       ))}
                     </tbody>
                   </table>
+                  <hr />
                   <button
                     onClick={() =>
                       stop({ timestamp: Date.now(), trackId: trackId })
                     }
                   >
-                    最終出走をゴール
+                    ゴール（自動順序）
                   </button>
                 </div>
               ))}
@@ -102,8 +111,20 @@ function App() {
             <div>
               <h2>リザルト(生データ)</h2>
               <table>
+                <thead>
+                  <tr>
+                    <th>No.</th>
+                    <th></th>
+                  </tr>
+                </thead>
                 <tbody>
-                  {}
+                  {data.results.map((result, i) => (
+                    <tr>
+                      <th>{i}</th>
+                      <td>{result.car_id}</td>
+                      <td>{formatTimeDuration(result.duration)}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>

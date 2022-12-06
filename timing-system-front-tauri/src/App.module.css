@@ -1,7 +1,7 @@
 @import "water.css";
 
 .App {
-  -webkit-user-select: none;
+  /*-webkit-user-select: none;*/
 }
 
 .columns {

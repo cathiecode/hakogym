@@ -1,6 +1,7 @@
 import { TimerValue } from "../store"
 import {useInterval } from "usehooks-ts";
 import { useState } from "react";
+import { formatTimeDuration } from "../utils";
 
 type TimerProps = {
   timer: TimerValue
@@ -20,8 +21,10 @@ export default function Timer({timer}: TimerProps) {
 
   switch(timer.state.type) {
     case "HaveNotStarted":
-      return <div>Pending...</div>
+      return <div>(開始されていません)</div>
     case "Started":
-      return <div>{Math.floor(currentDuration / 1000 / 60)}:{Math.floor(currentDuration % (1000 * 60) / 1000)}"{Math.floor((currentDuration % 1000) / 10).toString(10).padStart(2, "0")}</div>
+      return <div>{formatTimeDuration(currentDuration)}</div>
+    default:
+      return <div>{formatTimeDuration(timer.state.time)}</div>
   }
 }
