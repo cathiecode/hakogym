@@ -1,12 +1,11 @@
 @import "water.css";
 
-.App {
-  /*-webkit-user-select: none;*/
+body {
+  max-width: unset;
 }
 
-.columns {
-  display: flex;
-  justify-content: space-between;
+.App {
+  /*-webkit-user-select: none;*/
 }
 
 .App td, .App th {
