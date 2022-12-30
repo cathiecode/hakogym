@@ -1,16 +1,21 @@
 mod server;
 
-use std::{collections::{HashMap, VecDeque}, error};
+use std::{
+    collections::{HashMap, VecDeque},
+    sync::{Arc}, cell::RefCell,
+};
+use tokio::sync::{Mutex};
 
 use anyhow::Result;
 
+use async_trait::async_trait;
 use chrono::{TimeZone, Utc};
 use serde::{
     ser::{SerializeStruct, SerializeStructVariant},
     Serialize,
 };
+use server::proto::timing_system_server::{TimingSystem, TimingSystemServer};
 use thiserror::Error;
-use tonic::codegen::Body;
 
 type Duration = chrono::Duration;
 type TimeStamp = chrono::DateTime<chrono::Utc>;
@@ -181,25 +186,25 @@ impl Serialize for TimerState {
                 let mut state = serializer.serialize_struct("TimerState", 1)?;
                 state.serialize_field("type", "HaveNotStarted")?;
                 state.end()
-            },
+            }
             TimerState::Started { start_date } => {
                 let mut state = serializer.serialize_struct("TimerState", 2)?;
                 state.serialize_field("type", "Started")?;
                 state.serialize_field("start_date", &start_date.timestamp_millis())?;
                 state.end()
-            },
+            }
             TimerState::Stopped { time } => {
                 let mut state = serializer.serialize_struct("TimerState", 2)?;
                 state.serialize_field("type", "Stopped")?;
                 state.serialize_field("time", &time.num_milliseconds())?;
                 state.end()
-            },
+            }
             TimerState::Specified { time } => {
                 let mut state = serializer.serialize_struct("TimerState", 2)?;
                 state.serialize_field("type", "Specified")?;
                 state.serialize_field("time", &time.num_milliseconds())?;
                 state.end()
-            },
+            }
         }
     }
 }
@@ -255,11 +260,11 @@ impl Timer {
 }
 
 #[derive(Clone, Eq, PartialEq, Hash)]
-struct CarId {
+struct CompetitionEntryId {
     id: String,
 }
 
-impl CarId {
+impl CompetitionEntryId {
     fn new(id: &str) -> Self {
         Self { id: id.to_owned() }
     }
@@ -268,14 +273,14 @@ impl CarId {
     }
 }
 
-impl Serialize for CarId {
+impl Serialize for CompetitionEntryId {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: serde::Serializer {
+        S: serde::Serializer,
+    {
         serializer.serialize_str(&self.id)
     }
 }
-
 
 #[derive(Clone, Eq, PartialEq, Hash)]
 struct TrackId {
@@ -285,7 +290,8 @@ struct TrackId {
 impl Serialize for TrackId {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: serde::Serializer {
+        S: serde::Serializer,
+    {
         serializer.serialize_str(&self.id)
     }
 }
@@ -316,11 +322,11 @@ impl CompetitionConfigurationId {
 #[derive(Serialize)]
 struct RunningCar {
     timer: Timer,
-    id: CarId,
+    id: CompetitionEntryId,
 }
 
 impl RunningCar {
-    fn new(id: CarId) -> RunningCar {
+    fn new(id: CompetitionEntryId) -> RunningCar {
         RunningCar {
             timer: Timer::new(),
             id,
@@ -343,7 +349,7 @@ impl RunningCar {
         self.timer.set_time(time)
     }*/
 
-    fn get_id(&self) -> &CarId {
+    fn get_id(&self) -> &CompetitionEntryId {
         &self.id
     }
 }
@@ -364,8 +370,8 @@ impl Track {
         }
     }
 
-    pub fn register_next_car(&mut self, car_id: CarId) -> Result<()> {
-        self.pending_car = Some(RunningCar::new(car_id));
+    pub fn register_next_car(&mut self, competition_entry_id: CompetitionEntryId) -> Result<()> {
+        self.pending_car = Some(RunningCar::new(competition_entry_id));
         Ok(())
     }
 
@@ -384,9 +390,13 @@ impl Track {
         }
     }
 
-    pub fn stop(&mut self, date: TimeStamp, car_id: Option<CarId>) -> Result<TimeResult> {
-        let (car_index, car) = if let Some(car_id) = car_id {
-            self.find_running_car(&car_id)?
+    pub fn stop(
+        &mut self,
+        date: TimeStamp,
+        competition_entry_id: Option<CompetitionEntryId>,
+    ) -> Result<TimeResult> {
+        let (car_index, car) = if let Some(competition_entry_id) = competition_entry_id {
+            self.find_running_car(&competition_entry_id)?
         } else {
             self.running_cars
                 .iter_mut()
@@ -403,15 +413,18 @@ impl Track {
 
         Ok(TimeResult {
             duration: car.time(date)?,
-            car_id: car.get_id().clone(),
+            competition_entry_id: car.get_id().clone(),
         })
     }
 
-    fn find_running_car(&mut self, car_id: &CarId) -> Result<(usize, &mut RunningCar)> {
+    fn find_running_car(
+        &mut self,
+        competition_entry_id: &CompetitionEntryId,
+    ) -> Result<(usize, &mut RunningCar)> {
         if let Some(index) = self
             .running_cars
             .iter()
-            .position(|car| car.get_id() == car_id)
+            .position(|car| car.get_id() == competition_entry_id)
         {
             Ok((index, self.running_cars.get_mut(index).unwrap()))
         } else {
@@ -422,7 +435,7 @@ impl Track {
 
 struct TimeResult {
     duration: Duration,
-    car_id: CarId,
+    competition_entry_id: CompetitionEntryId,
 }
 
 impl TimeResult {
@@ -430,8 +443,8 @@ impl TimeResult {
         self.duration
     }
 
-    fn get_car_id(&self) -> &CarId {
-        &self.car_id
+    fn get_competition_entry_id(&self) -> &CompetitionEntryId {
+        &self.competition_entry_id
     }
 }
 
@@ -442,7 +455,7 @@ impl Serialize for TimeResult {
     {
         let mut state = serializer.serialize_struct("TimeResult", 2)?;
         state.serialize_field("duration", &self.duration.num_milliseconds())?;
-        state.serialize_field("car_id", &self.car_id)?;
+        state.serialize_field("competition_entry_id", &self.competition_entry_id)?;
         state.end()
     }
 }
@@ -456,14 +469,14 @@ struct Competition {
 enum CompetitionEventKind {
     RegisterNextCar {
         track_id: TrackId,
-        car_id: CarId,
+        competition_entry_id: CompetitionEntryId,
     },
     Start {
         track_id: TrackId,
     },
     Stop {
         track_id: TrackId,
-        car_id: Option<CarId>,
+        competition_entry_id: Option<CompetitionEntryId>,
     },
 }
 
@@ -494,10 +507,10 @@ impl Competition {
     fn register_next_car(
         &mut self,
         track_id: &TrackId,
-        car_id: CarId,
+        competition_entry_id: CompetitionEntryId,
     ) -> Result<(), anyhow::Error> {
         let track = self.get_track(track_id)?;
-        track.register_next_car(car_id.clone())?;
+        track.register_next_car(competition_entry_id.clone())?;
         Ok(())
     }
 
@@ -511,10 +524,10 @@ impl Competition {
         &mut self,
         timestamp: TimeStamp,
         track_id: &TrackId,
-        car_id: Option<&CarId>,
+        competition_entry_id: Option<&CompetitionEntryId>,
     ) -> Result<(), anyhow::Error> {
         let track = self.get_track(track_id)?;
-        let result = track.stop(timestamp, car_id.cloned())?;
+        let result = track.stop(timestamp, competition_entry_id.cloned())?;
         self.results.push(result);
         Ok(())
     }
@@ -532,122 +545,16 @@ impl Replayable for Competition {
 
     fn command(&mut self, event: &CompetitionEvent) -> Self::CommandResult {
         match &event.kind {
-            CompetitionEventKind::RegisterNextCar { track_id, car_id } => {
-                self.register_next_car(track_id, car_id.clone())
-            }
+            CompetitionEventKind::RegisterNextCar {
+                track_id,
+                competition_entry_id,
+            } => self.register_next_car(track_id, competition_entry_id.clone()),
             CompetitionEventKind::Start { track_id } => self.start(event.time_stamp, track_id),
-            CompetitionEventKind::Stop { track_id, car_id } => {
-                self.stop(event.time_stamp, track_id, car_id.as_ref())
-            }
-        }
-    }
-}
-
-trait Have<T> {
-    fn get(&mut self) -> &mut T;
-}
-
-trait MayHave<T> {
-    fn get(&mut self) -> Result<&mut T, anyhow::Error>;
-}
-
-fn time_stamp_from_unixmsec(unixmsec: u64) -> Result<TimeStamp, anyhow::Error> {
-    println!("time-Stamp-from-unixmsec: {}", unixmsec);
-
-    let redundunt_nsec = (u64::try_from(unixmsec)? % 1000) as u32;
-
-    Utc.timestamp_opt((unixmsec / 1000) as i64, redundunt_nsec)
-        .single()
-        .ok_or(AppError::LogicError.into())
-}
-
-struct TrackStateDTO {}
-
-trait CompetitionService<'a, F>: MayHave<Replayer<Competition, F>>
-where
-    F: Fn() -> Competition + 'a,
-{
-    fn register_next_car(
-        &mut self,
-        time_stamp: u64,
-        track_id: &str,
-        car_id: &str,
-    ) -> Result<(), anyhow::Error> {
-        let competition: &mut Replayer<Competition, F> = MayHave::get(self)?;
-        competition.command(CompetitionEvent {
-            time_stamp: time_stamp_from_unixmsec(time_stamp)?,
-            kind: CompetitionEventKind::RegisterNextCar {
-                track_id: TrackId::new(track_id),
-                car_id: CarId::new(car_id),
-            },
-        });
-
-        Ok(())
-    }
-
-    fn get_current_tracks(&mut self) -> Result<Vec<String>, anyhow::Error> {
-        let competition: &mut Replayer<Competition, F> = MayHave::get(self)?;
-
-        Ok(competition
-            .get()
-            .tracks
-            .iter()
-            .map(|track| track.0.get().to_owned())
-            .collect::<Vec<String>>())
-    }
-
-    fn get_registered_next_car(&mut self, track_id: &str) -> Result<Option<String>, anyhow::Error> {
-        let competition: &mut Replayer<Competition, F> = MayHave::get(self)?;
-
-        Ok(competition
-            .get()
-            .tracks
-            .get(&TrackId::new(track_id))
-            .ok_or(AppError::NoSuchTrack)?
-            .pending_car
-            .as_ref()
-            .map(|car| car.get_id().get().to_owned()))
-    }
-
-    fn start(&mut self, time_stamp: u64, track_id: &str) -> Result<(), anyhow::Error> {
-        let competition: &mut Replayer<Competition, F> = MayHave::get(self)?;
-        competition.command(CompetitionEvent::new(
-            time_stamp_from_unixmsec(time_stamp)?,
-            CompetitionEventKind::Start {
-                track_id: TrackId::new(track_id),
-            },
-        ));
-
-        Ok(())
-    }
-
-    fn stop(
-        &mut self,
-        time_stamp: u64,
-        track_id: &str,
-        car_id: Option<&CarId>,
-    ) -> Result<(), anyhow::Error> {
-        let competition: &mut Replayer<Competition, F> = MayHave::get(self)?;
-        competition.command(CompetitionEvent::new(
-            time_stamp_from_unixmsec(time_stamp)?,
             CompetitionEventKind::Stop {
-                track_id: TrackId::new(track_id),
-                car_id: car_id.cloned(),
-            },
-        ));
-
-        Ok(())
-    }
-
-    fn get_results(&'a mut self) -> Result<&'a [TimeResult], anyhow::Error> {
-        let competition: &mut Replayer<Competition, F> = MayHave::get(self)?;
-
-        Ok(competition.get().results.as_slice())
-    }
-
-    fn get_state_tree(&mut self) -> Result<String, anyhow::Error> {
-        let competition: &mut Replayer<Competition, F> = MayHave::get(self)?;
-        Ok(serde_json::to_string(competition.get()).unwrap_or_else(|error| error.to_string()))
+                track_id,
+                competition_entry_id,
+            } => self.stop(event.time_stamp, track_id, competition_entry_id.as_ref()),
+        }
     }
 }
 
@@ -675,7 +582,7 @@ impl CompetitionConfiguration {
     }
 }
 
-#[tonic::async_trait]
+#[async_trait]
 trait CompetitionConfigurationRepository {
     async fn competition_configuration(
         &mut self,
@@ -683,9 +590,17 @@ trait CompetitionConfigurationRepository {
     ) -> Result<Option<CompetitionConfiguration>, anyhow::Error>;
 }
 
+#[async_trait]
+trait CompetitionResultRepository {
+    async fn competition_result(
+        &mut self,
+        competition_entry_id: CompetitionEntryId,
+    ) -> Result<(), anyhow::Error>;
+}
+
 struct MockCompetitionConfigurationRepository(CompetitionConfiguration);
 
-#[tonic::async_trait]
+#[async_trait]
 impl CompetitionConfigurationRepository for MockCompetitionConfigurationRepository {
     async fn competition_configuration(
         &mut self,
@@ -695,25 +610,40 @@ impl CompetitionConfigurationRepository for MockCompetitionConfigurationReposito
     }
 }
 
-struct TimingSystemApp<T>
-where
-    T: CompetitionConfigurationRepository + Sync + Send,
-{
-    competition: Option<Replayer<Competition, Box<dyn Fn() -> Competition + Sync + Send>>>,
-    competition_configuration_repository: T,
+struct MockCompetitionResultRepository();
+
+#[async_trait]
+impl CompetitionResultRepository for MockCompetitionResultRepository {
+    async fn competition_result(&mut self, competition_entry_id: CompetitionEntryId) -> Result<(), anyhow::Error> {
+        todo!()
+    }
 }
 
-impl<T> TimingSystemApp<T>
-where
-    T: CompetitionConfigurationRepository + Sync + Send,
-{
-    // TODO:
+fn time_stamp_from_unixmsec(unixmsec: u64) -> Result<TimeStamp, anyhow::Error> {
+    println!("time-Stamp-from-unixmsec: {}", unixmsec);
+
+    let redundunt_nsec = (u64::try_from(unixmsec)? % 1000) as u32;
+
+    Utc.timestamp_opt((unixmsec / 1000) as i64, redundunt_nsec)
+        .single()
+        .ok_or(AppError::LogicError.into())
+}
+
+struct TimingSystemApp {
+    competition: Option<Replayer<Competition, Box<dyn Fn() -> Competition + Sync + Send>>>,
+    competition_configuration_repository: Arc<Mutex<dyn CompetitionConfigurationRepository + Sync + Send>>,
+    competition_result_repository: Arc<Mutex<dyn CompetitionResultRepository + Sync + Send>>,
+}
+
+impl TimingSystemApp {
     async fn create_competition(
         &mut self,
         config_id: CompetitionConfigurationId,
     ) -> Result<(), anyhow::Error> {
         let config = self
             .competition_configuration_repository
+            .lock()
+            .await
             .competition_configuration(&config_id)
             .await?
             .ok_or(AppError::CopmetitionConfigurationDidNotFound)?;
@@ -721,28 +651,88 @@ where
 
         Ok(())
     }
-}
 
-impl<T> MayHave<Replayer<Competition, Box<dyn Fn() -> Competition + Sync + Send>>>
-    for TimingSystemApp<T>
-where
-    T: CompetitionConfigurationRepository + Sync + Send,
-{
-    fn get(
+    fn get_competition<'a>(&'a mut self) -> Result<&'a mut Replayer<Competition, Box<dyn Fn() -> Competition + Sync + Send>>, anyhow::Error> {
+        Ok(self.competition.as_mut().ok_or(AppError::CompetitionHaveNotConfigured)?)
+    }
+
+    fn register_next_car(
         &mut self,
-    ) -> Result<&mut Replayer<Competition, Box<dyn Fn() -> Competition + Sync + Send>>, anyhow::Error>
-    {
+        time_stamp: u64,
+        track_id: &str,
+        competition_entry_id: &str,
+    ) -> Result<(), anyhow::Error> {
+        self.get_competition()?.command(CompetitionEvent {
+            time_stamp: time_stamp_from_unixmsec(time_stamp)?,
+            kind: CompetitionEventKind::RegisterNextCar {
+                track_id: TrackId::new(track_id),
+                competition_entry_id: CompetitionEntryId::new(competition_entry_id),
+            },
+        });
+
+        Ok(())
+    }
+
+    fn start(&mut self, time_stamp: u64, track_id: &str) -> Result<(), anyhow::Error> {
+        self.get_competition()?.command(CompetitionEvent::new(
+            time_stamp_from_unixmsec(time_stamp)?,
+            CompetitionEventKind::Start {
+                track_id: TrackId::new(track_id),
+            },
+        ));
+
+        Ok(())
+    }
+
+    fn stop(
+        &mut self,
+        time_stamp: u64,
+        track_id: &str,
+        competition_entry_id: Option<&CompetitionEntryId>,
+    ) -> Result<(), anyhow::Error> {
+        self.get_competition()?.command(CompetitionEvent::new(
+            time_stamp_from_unixmsec(time_stamp)?,
+            CompetitionEventKind::Stop {
+                track_id: TrackId::new(track_id),
+                competition_entry_id: competition_entry_id.cloned(),
+            },
+        ));
+
+        Ok(())
+    }
+
+    fn get_current_tracks(&mut self) -> Result<Vec<String>, anyhow::Error> {
         Ok(self
-            .competition
-            .as_mut()
-            .ok_or(AppError::CompetitionHaveNotConfigured)?)
+            .get_competition()?
+            .get()
+            .tracks
+            .iter()
+            .map(|track| track.0.get().to_owned())
+            .collect::<Vec<String>>())
+    }
+
+    fn get_registered_next_car(&mut self, track_id: &str) -> Result<Option<String>, anyhow::Error> {
+        Ok(self
+            .get_competition()?
+            .get()
+            .tracks
+            .get(&TrackId::new(track_id))
+            .ok_or(AppError::NoSuchTrack)?
+            .pending_car
+            .as_ref()
+            .map(|car| car.get_id().get().to_owned()))
+    }
+
+
+    fn get_results<'a>(&'a mut self) -> Result<&'a [TimeResult], anyhow::Error> {
+        Ok(self.get_competition()?.get().results.as_slice())
+    }
+
+    fn get_state_tree(&mut self) -> Result<String, anyhow::Error> {
+        Ok(serde_json::to_string(self.get_competition()?.get()).unwrap_or_else(|error| error.to_string()))
     }
 }
 
-impl<T> CompetitionService<'_, Box<dyn Fn() -> Competition + Sync + Send>> for TimingSystemApp<T> where
-    T: CompetitionConfigurationRepository + Sync + Send
-{
-}
 
 #[tokio::main]
 async fn main() {

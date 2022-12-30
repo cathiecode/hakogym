@@ -10,8 +10,8 @@ use tonic::{transport::Server, Request, Response, Status};
 
 use crate::server::proto::timing_system_server::{TimingSystem, TimingSystemServer};
 use crate::{
-    CarId, CompetitionConfigurationId, CompetitionConfigurationTrack, CompetitionService,
-    MockCompetitionConfigurationRepository, TimingSystemApp,
+    CompetitionEntryId, CompetitionConfigurationId, CompetitionConfigurationTrack,
+    MockCompetitionConfigurationRepository, TimingSystemApp, MockCompetitionResultRepository,
 };
 
 use self::proto::{
@@ -25,7 +25,7 @@ pub mod proto {
 }
 
 pub struct TimingSystemAppController {
-    competition: Arc<Mutex<TimingSystemApp<MockCompetitionConfigurationRepository>>>,
+    competition: Arc<Mutex<TimingSystemApp>>,
     change_watcher_sender: tokio::sync::watch::Sender<()>,
     change_watcher_receiver: tokio::sync::watch::Receiver<()>,
 }
@@ -36,7 +36,7 @@ impl TimingSystemAppController {
         Self {
             competition: Arc::new(Mutex::new(TimingSystemApp {
                 competition: None,
-                competition_configuration_repository: MockCompetitionConfigurationRepository(
+                competition_configuration_repository: Arc::new(Mutex::new(MockCompetitionConfigurationRepository(
                     crate::CompetitionConfiguration {
                         tracks: {
                             let mut map = HashMap::new();
@@ -47,7 +47,8 @@ impl TimingSystemAppController {
                             map
                         },
                     },
-                ),
+                ))),
+                competition_result_repository: Arc::new(Mutex::new(MockCompetitionResultRepository()))
             })),
             change_watcher_sender,
             change_watcher_receiver,
@@ -125,7 +126,7 @@ impl TimingSystem for TimingSystemAppController {
                 params
                     .car_id
                     .as_ref()
-                    .map(|id| CarId::new(id.as_str()))
+                    .map(|id| CompetitionEntryId::new(id.as_str()))
                     .as_ref(),
             )
             .map_err(|e| Status::failed_precondition(e.to_string()))?;
@@ -174,7 +175,7 @@ impl TimingSystem for TimingSystemAppController {
                 .map_err(|e| Status::failed_precondition(e.to_string()))?
                 .iter()
                 .map(|result| proto::TimeResult {
-                    car_id: result.get_car_id().get().to_owned(),
+                    car_id: result.get_competition_entry_id().get().to_owned(),
                     time: result.get_duration().num_milliseconds().abs() as u64,
                 })
                 .collect(),
