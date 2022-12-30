@@ -3,19 +3,22 @@ import Loader from "./components/Loader";
 import { useRef } from "react";
 import { createCompetition, registerNextCar, start, stop } from "./command";
 import Timer from "./components/Timer";
-import {Toaster} from "react-hot-toast";
+import { Toaster } from "react-hot-toast";
 
 import styles from "./App.module.css";
 import { formatTimeDuration } from "./utils";
+import { useEntryList } from "./hooks";
 
 function App() {
   const stateTree = useStateTree();
 
   const registerPendingCarInput = useRef<HTMLInputElement>(null);
 
+  const entryList = useEntryList("competitionId");
+
   return (
     <div className={styles.App}>
-      <Toaster />
+      <Toaster position="bottom-right" />
       <Loader data={stateTree.data}>
         {(data) => (
           <div className={styles.columns}>

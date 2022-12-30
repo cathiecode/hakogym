@@ -8,7 +8,6 @@ async function command<T extends InvokeArgs, U>(
   try {
     return await invoke<U>(command_name, args);
   } catch (e) {
-    alert(e);
     console.error(e);
     toast.error(`${e}`);
     throw e;
