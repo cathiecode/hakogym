@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::pin::Pin;
 use std::sync::Arc;
+use log::trace;
 use tokio::sync::{mpsc, Mutex};
 
 use anyhow::Result;
@@ -103,6 +104,7 @@ impl TimingSystem for TimingSystemAppController {
         request: Request<proto::StartRequest>,
     ) -> Result<Response<proto::CommandReply>, Status> {
         let params = request.get_ref();
+        trace!("Received start request at {}", params.timestamp);
         self.competition
             .lock()
             .await
@@ -117,6 +119,7 @@ impl TimingSystem for TimingSystemAppController {
         request: Request<proto::StopRequest>,
     ) -> Result<Response<proto::CommandReply>, Status> {
         let params = request.get_ref();
+        trace!("Received stop request at {}", params.timestamp);
         self.competition
             .lock()
             .await

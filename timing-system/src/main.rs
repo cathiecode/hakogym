@@ -5,6 +5,7 @@ use std::{
     collections::{HashMap, VecDeque},
     sync::Arc,
 };
+
 use tokio::sync::Mutex;
 
 use anyhow::Result;
@@ -15,8 +16,11 @@ use serde::{
     ser::{SerializeStruct, SerializeStructVariant},
     Serialize,
 };
+
 use server::proto::timing_system_server::{TimingSystem, TimingSystemServer};
 use thiserror::Error;
+
+use log::{trace, debug, error};
 
 type Duration = chrono::Duration;
 type TimeStamp = chrono::DateTime<chrono::Utc>;
@@ -128,6 +132,7 @@ impl<T: PartialOrd, Model: Replayable<Command = T>, Factory: Fn() -> Model>
     }
 
     fn recalc(&mut self) {
+        debug!("State recaliculation caused");
         self.entity = (self.factory)();
         for command in self.commands.iter() {
             self.entity.command(&command.command);
@@ -212,6 +217,7 @@ impl Serialize for TimerState {
 
 impl Timer {
     fn new() -> Timer {
+        trace!("New timer created");
         Timer {
             state: TimerState::HaveNotStarted,
         }
@@ -221,6 +227,7 @@ impl Timer {
         if let TimerState::Started { .. } = self.state {
             Err(AppError::TimerAlreadyStarted.into())
         } else {
+            trace!("Timer started at {}", date);
             self.state = TimerState::Started { start_date: date };
             Ok(())
         }
@@ -228,6 +235,7 @@ impl Timer {
 
     fn stop(&mut self, date: TimeStamp) -> Result<()> {
         if let TimerState::Started { start_date } = self.state {
+            trace!("Timer stopped at {}", date);
             self.state = TimerState::Stopped {
                 time: date - start_date,
             };
@@ -644,9 +652,9 @@ impl CompetitionResultRepository for MockCompetitionResultRepository {
 fn time_stamp_from_unixmsec(unixmsec: u64) -> Result<TimeStamp, anyhow::Error> {
     println!("time-Stamp-from-unixmsec: {}", unixmsec);
 
-    let redundunt_nsec = (u64::try_from(unixmsec)? % 1000) as u32;
+    let redundunt_nsec = (unixmsec % 1000) as u32;
 
-    Utc.timestamp_opt((unixmsec / 1000) as i64, redundunt_nsec)
+    Utc.timestamp_opt((unixmsec / 1000) as i64, redundunt_nsec * 1000 * 1000)
         .single()
         .ok_or(AppError::LogicError.into())
 }
@@ -770,5 +778,6 @@ impl TimingSystemApp {
 
 #[tokio::main]
 async fn main() {
+    env_logger::init();
     server::run().await.unwrap();
 }
