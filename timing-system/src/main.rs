@@ -1,10 +1,11 @@
 mod server;
 
 use std::{
+    cell::RefCell,
     collections::{HashMap, VecDeque},
-    sync::{Arc}, cell::RefCell,
+    sync::Arc,
 };
-use tokio::sync::{Mutex};
+use tokio::sync::Mutex;
 
 use anyhow::Result;
 
@@ -460,10 +461,22 @@ impl Serialize for TimeResult {
     }
 }
 
-#[derive(Serialize)]
 struct Competition {
     results: Vec<TimeResult>,
     tracks: HashMap<TrackId, Track>,
+    on_result: Option<Box<dyn Fn() -> () + Sync + Send>>,
+}
+
+impl Serialize for Competition {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut state = serializer.serialize_struct("Competition", 2)?;
+        state.serialize_field("results", &self.results)?;
+        state.serialize_field("tracks", &self.tracks)?;
+        state.end()
+    }
 }
 
 enum CompetitionEventKind {
@@ -537,6 +550,11 @@ impl Competition {
             .get_mut(track_id)
             .ok_or(AppError::NoSuchTrack.into())
     }
+
+    fn on_result(mut self, callback: Box<dyn Fn() -> () + Sync + Send>) -> Self {
+        self.on_result = Some(callback);
+        self
+    }
 }
 
 impl Replayable for Competition {
@@ -578,6 +596,7 @@ impl CompetitionConfiguration {
         Competition {
             results: Vec::new(),
             tracks,
+            on_result: None,
         }
     }
 }
@@ -614,7 +633,10 @@ struct MockCompetitionResultRepository();
 
 #[async_trait]
 impl CompetitionResultRepository for MockCompetitionResultRepository {
-    async fn competition_result(&mut self, competition_entry_id: CompetitionEntryId) -> Result<(), anyhow::Error> {
+    async fn competition_result(
+        &mut self,
+        competition_entry_id: CompetitionEntryId,
+    ) -> Result<(), anyhow::Error> {
         todo!()
     }
 }
@@ -631,7 +653,8 @@ fn time_stamp_from_unixmsec(unixmsec: u64) -> Result<TimeStamp, anyhow::Error> {
 
 struct TimingSystemApp {
     competition: Option<Replayer<Competition, Box<dyn Fn() -> Competition + Sync + Send>>>,
-    competition_configuration_repository: Arc<Mutex<dyn CompetitionConfigurationRepository + Sync + Send>>,
+    competition_configuration_repository:
+        Arc<Mutex<dyn CompetitionConfigurationRepository + Sync + Send>>,
     competition_result_repository: Arc<Mutex<dyn CompetitionResultRepository + Sync + Send>>,
 }
 
@@ -647,13 +670,25 @@ impl TimingSystemApp {
             .competition_configuration(&config_id)
             .await?
             .ok_or(AppError::CopmetitionConfigurationDidNotFound)?;
-        self.competition = Some(Replayer::new(Box::new(move || config.build_competition())));
+        self.competition = Some(Replayer::new(Box::new(move || {
+            config
+                .build_competition()
+                .on_result(Box::new(|| println!("Changed!")))
+        })));
 
         Ok(())
     }
 
-    fn get_competition<'a>(&'a mut self) -> Result<&'a mut Replayer<Competition, Box<dyn Fn() -> Competition + Sync + Send>>, anyhow::Error> {
-        Ok(self.competition.as_mut().ok_or(AppError::CompetitionHaveNotConfigured)?)
+    fn get_competition<'a>(
+        &'a mut self,
+    ) -> Result<
+        &'a mut Replayer<Competition, Box<dyn Fn() -> Competition + Sync + Send>>,
+        anyhow::Error,
+    > {
+        Ok(self
+            .competition
+            .as_mut()
+            .ok_or(AppError::CompetitionHaveNotConfigured)?)
     }
 
     fn register_next_car(
@@ -723,16 +758,15 @@ impl TimingSystemApp {
             .map(|car| car.get_id().get().to_owned()))
     }
 
-
     fn get_results<'a>(&'a mut self) -> Result<&'a [TimeResult], anyhow::Error> {
         Ok(self.get_competition()?.get().results.as_slice())
     }
 
     fn get_state_tree(&mut self) -> Result<String, anyhow::Error> {
-        Ok(serde_json::to_string(self.get_competition()?.get()).unwrap_or_else(|error| error.to_string()))
+        Ok(serde_json::to_string(self.get_competition()?.get())
+            .unwrap_or_else(|error| error.to_string()))
     }
 }
-
 
 #[tokio::main]
 async fn main() {
