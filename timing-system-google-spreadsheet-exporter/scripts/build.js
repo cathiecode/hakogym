@@ -22,3 +22,4 @@ run(".", "proto-loader-gen-types", [
 ]);
 run(".", "tsc");
 copySync("../proto/", "build/proto");
+copySync("../secrets/", "build/secrets");

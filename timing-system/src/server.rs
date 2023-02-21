@@ -49,7 +49,6 @@ impl TimingSystemAppController {
                         },
                     },
                 ))),
-                competition_result_repository: Arc::new(Mutex::new(MockCompetitionResultRepository()))
             })),
             change_watcher_sender,
             change_watcher_receiver,

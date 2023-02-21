@@ -1,7 +1,6 @@
 mod server;
 
 use std::{
-    cell::RefCell,
     collections::{HashMap, VecDeque},
     sync::Arc,
 };
@@ -663,7 +662,6 @@ struct TimingSystemApp {
     competition: Option<Replayer<Competition, Box<dyn Fn() -> Competition + Sync + Send>>>,
     competition_configuration_repository:
         Arc<Mutex<dyn CompetitionConfigurationRepository + Sync + Send>>,
-    competition_result_repository: Arc<Mutex<dyn CompetitionResultRepository + Sync + Send>>,
 }
 
 impl TimingSystemApp {

@@ -1,8 +1,12 @@
-# Hakogym-system-ng
-> Hakogym system: Next Generation
+# Hakogym-Automation-System
+> Hakogym "Automation" system: Next Generation
 
 ## Development
 ### Prerequirements
 - `sh`
 - `npm`(Installing via node version managers recommended)
 - `protoc`([command-not-found.com](https://command-not-found.com/protoc))
+- `cargo`([Rust]https://www.rust-lang.org/ja/tools/install)
+
+### secrets
+Please place Google authentication client secret `json` file at `secrets/google-api-secret.json`.
