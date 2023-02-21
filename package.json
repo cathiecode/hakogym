@@ -1,4 +1,8 @@
 {
+  "type": "module",
+  "scripts": {
+    "build": "scripts/build.js"
+  },
   "devDependencies": {
     "dotenv": "^16.0.3",
     "electron": "^22.0.0",
