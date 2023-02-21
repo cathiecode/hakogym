@@ -20,6 +20,7 @@
     "@google-cloud/local-auth": "^2.1.0",
     "@grpc/grpc-js": "^1.8.9",
     "@grpc/proto-loader": "^0.7.5",
-    "googleapis": "^105.0.0"
+    "googleapis": "^105.0.0",
+    "stable-hash": "^0.0.3"
   }
 }

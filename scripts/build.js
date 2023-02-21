@@ -8,6 +8,10 @@ const run = (cwd, command, args) => {
   spawnSync(command, args, {cwd, stdio: "inherit"});
 }
 
-run("timing-system", "cargo", ["build", "--release"]); 
+run("timing-system", "cargo", [
+  "build",
+  "--release",
+  "--target=x86_64-pc-windows-gnu",
+]); 
 run("timing-system-front-tauri", "npm", ["run", "build"]); 
 run("timing-system-google-spreadsheet-exporter", "npm", ["run", "build"])

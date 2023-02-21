@@ -5,6 +5,8 @@ import { ProtoGrpcType } from "./types/generated/timing-system";
 import google from "googleapis";
 import { authenticate } from "@google-cloud/local-auth";
 import path from "node:path";
+import { SubscribeStateChangeReply } from "./types/generated/timingsystem/SubscribeStateChangeReply";
+import stableHash from "stable-hash";
 
 const packageDefinition = protoLoader.loadSync("./proto/timing-system.proto");
 
@@ -27,25 +29,78 @@ async function getGoogleApiAuthorization() {
   return client;
 }
 
+const TARGET_SHEET_TITLE = "HAS_TIMING_SYSTEM_DATA";
+
 export default async function main() {
-  const sheetId = process.argv[2];
+  const spreadsheetId = process.argv[2];
 
   const auth = await getGoogleApiAuthorization();
 
-  const gsheets = new google.sheets_v4.Sheets({auth});
+  const gsheets = new google.sheets_v4.Sheets({ auth });
 
-  const sheet = await gsheets.spreadsheets.get({spreadsheetId: sheetId});
+  const spreadSheet = await gsheets.spreadsheets.get({ spreadsheetId });
 
-  console.log("Connected with sheet ", sheet.data.properties?.title ?? "<untitled>");
+  console.log(
+    "Connected with sheet ",
+    spreadSheet.data.properties?.title ?? "<untitled>"
+  );
+
+  const targetSheet = spreadSheet.data.sheets?.find(
+    (sheet) => sheet.properties?.title === TARGET_SHEET_TITLE
+  );
+
+  if (!targetSheet) {
+    throw new Error(
+      `Failed to find sheet named ${TARGET_SHEET_TITLE}. Please create new sheet titled "${TARGET_SHEET_TITLE}".`
+    );
+  }
 
   const client = new proto.timingsystem.TimingSystem(
     "localhost:11001",
     grpc.credentials.createInsecure()
   );
 
-  client.subscribeStateChange({}).on("data", (data) => {
-    console.log(data);
-  });
+  let lastUpdatedResultHash: string | null = null;
+
+  client
+    .subscribeStateChange({})
+    .on("data", async (data: SubscribeStateChangeReply) => {
+      if (!data.state) {
+        console.log("Failed to get state. skipping upload");
+        return;
+      }
+
+      console.log("Received change.");
+
+      const state = JSON.parse(data.state);
+
+      const resultHash = stableHash(state.results);
+
+      if (resultHash === lastUpdatedResultHash) {
+        console.log("Result did not changed. skipping upload");
+        return;
+      }
+
+      const values = state.results.map((result: {duration: number, competition_entry_id: string}) => [
+        result.competition_entry_id,
+        result.duration,
+      ]);
+
+      await gsheets.spreadsheets.values.update({
+        spreadsheetId: spreadsheetId,
+        range: "A1",
+        valueInputOption: "RAW",
+        requestBody: {
+          range: "A1",
+          majorDimension: "ROWS",
+          values: values,
+        },
+      });
+
+      lastUpdatedResultHash = resultHash;
+
+      console.log("Uploaded.");
+    });
 }
 
 main();
