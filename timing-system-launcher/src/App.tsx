@@ -5,12 +5,12 @@ import { toast, Toaster } from "react-hot-toast";
 
 import styles from "./App.module.css";
 
-const SERVICES = ["Test"] as const;
+const SERVICES = ["main"] as const;
 
 const StatusIcon = {
   Spawned: <span className={`${styles.statusIcon} ${styles.spawned}`}></span>,
   Exited: <span className={`${styles.statusIcon} ${styles.exited}`}></span>,
-  unknown: <span className={`${styles.statusIcon} ${styles.exited}`}></span>,
+  unknown: <span className={`${styles.statusIcon} ${styles.unknown}`}></span>,
 };
 
 function App() {
@@ -23,12 +23,15 @@ function App() {
       const payload = event.payload as {
         service: string;
         type: "Spawned" | "Exited";
-      };
-      toast(`${payload.service}: ${payload.type}`);
-      setServiceState((current) => ({
-        ...current,
-        [payload.service]: payload.type,
-      }));
+      } | {type: "Message", service: string, message: string};
+      toast(`${payload.service}: ${payload.type}${payload.type === "Message" ? payload.message : ""}`);
+
+      if (payload.type === "Spawned" || payload.type === "Exited") {
+        setServiceState((current) => ({
+          ...current,
+          [payload.service]: payload.type,
+        }));
+      }
     });
 
     return () => {

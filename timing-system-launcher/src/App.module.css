@@ -36,3 +36,7 @@
 .statusIcon.exited:before {
   background-color: #f00;
 }
+
+.statusIcon.unknows {
+  background-color: #aaa;
+}

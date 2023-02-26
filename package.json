@@ -6,6 +6,7 @@
   "devDependencies": {
     "dotenv": "^16.0.3",
     "electron": "^22.0.0",
+    "fs-extra": "^11.1.0",
     "grpc-tools": "^1.11.3",
     "openapi-typescript": "^5.4.1",
     "ts-proto": "^1.131.0",
@@ -16,6 +17,7 @@
     "timing-system-front-tauri",
     "timing-system-server",
     "timing-system-front-gateway",
+    "timing-system-launcher",
     "timing-system-google-spreadsheet-exporter"
   ]
 }

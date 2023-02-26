@@ -12,4 +12,4 @@
 Please place Google authentication client secret `json` file at `secrets/google-api-secret.json`.
 
 ### Node.js
-Download (Node.js 18)[https://nodejs.org/dist/v18.14.2/node-v18.14.2-win-x64.zip] and place everything in `build/node18`.
+Download (Node.js 18 Windows prebuilt binary zip file)[https://nodejs.org/] and extract everything in `node-v18.*` into `deps/node18`.
