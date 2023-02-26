@@ -7,10 +7,6 @@ import {ErrorBoundary} from "react-error-boundary";
 
 const queryClient = new QueryClient();
 
-appWindow.onCloseRequested(async (event) => {
-  event.preventDefault();
-});
-
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>

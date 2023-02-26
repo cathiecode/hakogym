@@ -6,22 +6,14 @@ import { toast, Toaster } from "react-hot-toast";
 import styles from "./App.module.css";
 import { invoke } from "@tauri-apps/api";
 
-const launch = async () => {
-  console.log(await invoke('launch_request', {config: {}}))
-}
-
 const StatusIcon = {
   Spawned: <span className={`${styles.statusIcon} ${styles.spawned}`}></span>,
   Exited: <span className={`${styles.statusIcon} ${styles.exited}`}></span>,
   unknown: <span className={`${styles.statusIcon} ${styles.unknown}`}></span>,
 };
 
-function App() {
+export default function StatusPage() {
   const [services, setServices] = useState(new Map<string, "Spawned" | "Exited">());
-
-  /*const [serviceState, setServiceState] = useState<
-    Record<typeof SERVICES[number], "Spawned" | "Exited" | undefined>
-  >({} as any);*/
 
   useEffect(() => {
     const unlisten = listen("service_event", (event) => {
@@ -49,8 +41,6 @@ function App() {
 
       <h1>計時サブシステムステータス</h1>
 
-      <button onClick={launch}>Start</button>
-
       <table className={styles.statusTable}>
         <tbody>
           {[...services.entries()].map(([serviceName, serviceStatus], i) => (
@@ -67,5 +57,3 @@ function App() {
     </div>
   );
 }
-
-export default App;

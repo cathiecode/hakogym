@@ -11,12 +11,15 @@
     "tauri": "tauri"
   },
   "dependencies": {
-    "@tanstack/react-location": "^3.7.4",
     "@tauri-apps/api": "^1.2.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-hook-form": "^7.43.2",
     "react-hot-toast": "^2.4.0",
-    "ress": "^5.0.2"
+    "react-router": "^6.8.1",
+    "react-router-dom": "^6.8.1",
+    "ress": "^5.0.2",
+    "water.css": "^2.1.1"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^1.2.3",
