@@ -4,6 +4,11 @@ import { emit, listen } from "@tauri-apps/api/event";
 import { toast, Toaster } from "react-hot-toast";
 
 import styles from "./App.module.css";
+import { invoke } from "@tauri-apps/api";
+
+const launch = async () => {
+  console.log(await invoke('launch_request', {config: {}}))
+}
 
 const StatusIcon = {
   Spawned: <span className={`${styles.statusIcon} ${styles.spawned}`}></span>,
@@ -43,6 +48,8 @@ function App() {
       <Toaster position="bottom-left" />
 
       <h1>計時サブシステムステータス</h1>
+
+      <button onClick={launch}>Start</button>
 
       <table className={styles.statusTable}>
         <tbody>

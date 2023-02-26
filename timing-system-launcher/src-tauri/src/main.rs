@@ -3,25 +3,29 @@
     windows_subsystem = "windows"
 )]
 
-use std::{fmt::Debug, path::Path, process::Command, sync::mpsc, thread, time::Duration};
-use tauri::Manager;
+use std::{path::Path, process::Command, sync::mpsc::{self, SyncSender}, thread, time::Duration};
+use once_cell::sync::OnceCell;
+use tauri::{Manager, App};
+
+struct AppGlobal {
+    service_message_sender: SyncSender<ServiceEvent>
+}
 
 #[tokio::main]
 async fn main() {
-    let (tx, rx) = mpsc::channel();
-
     let path = std::env::current_dir().unwrap();
     println!("starting dir: {}", path.display());
 
-    // launch(LaunchConfiguration {}, tx);
+    let (tx, rx) = mpsc::sync_channel(4);
 
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
+        .manage(AppGlobal {service_message_sender: tx})
         .setup(|app| {
             let app_handle = app.handle();
             tokio::spawn(async move {
                 loop {
                     let message = rx.recv();
-
+        
                     if let Ok(event) = message {
                         app_handle.emit_all("service_event", event);
                     }
@@ -29,13 +33,16 @@ async fn main() {
             });
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler!(
-            launch
-        ))
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .invoke_handler(tauri::generate_handler!(launch_request))
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application");
+
+    app.run(|_app_handle, event| match event {
+        _ => {}
+    })
 }
 
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 struct LaunchConfiguration {}
 
 type Service = String;
@@ -51,7 +58,7 @@ enum ServiceEvent {
 fn start_service(
     name_orig: &str,
     mut command: Command,
-    message_channel_origin: &mpsc::Sender<ServiceEvent>,
+    message_channel_origin: &mpsc::SyncSender<ServiceEvent>,
 ) {
     let message_channel = message_channel_origin.clone();
     let name = name_orig.to_string();
@@ -84,7 +91,11 @@ fn start_service(
 }
 
 #[tauri::command]
-fn launch(config: LaunchConfiguration, message_channel: mpsc::Sender<ServiceEvent>) {
+fn launch_request(state: tauri::State<AppGlobal>, config: LaunchConfiguration) {
+    launch(config, state.service_message_sender.clone());
+}
+
+fn launch(config: LaunchConfiguration, message_channel: mpsc::SyncSender<ServiceEvent>) {
     println!("launch");
 
     start_service(
@@ -96,10 +107,10 @@ fn launch(config: LaunchConfiguration, message_channel: mpsc::Sender<ServiceEven
         &message_channel,
     );
 
-    /*start_service(
+    start_service(
         "GUI",
         {
-            let command = Command::new(Path::new(".").join("data").join("timing-system-front.exe"));
+            let command = Command::new(Path::new(".").join("data").join("timing-system-front-tauri.exe"));
             command
         },
         &message_channel,
@@ -108,12 +119,12 @@ fn launch(config: LaunchConfiguration, message_channel: mpsc::Sender<ServiceEven
     start_service(
         "Google Spreadsheet Exporter",
         {
-            let command = Command::new(Path::new(".").join("data").join("node18").join("node.exe"));
-            command.args([Path::new(".").join("data").join("timing-system-google-spreadsheet-exporter")]);
+            let mut command = Command::new(Path::new(".").join("data").join("node18").join("node.exe"));
+            command.args([Path::new(".")
+                .join("data")
+                .join("timing-system-google-spreadsheet-exporter")]);
             command
         },
-        &message_channel
+        &message_channel,
     )
-    */
 }
-
