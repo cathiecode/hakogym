@@ -8,7 +8,7 @@ import path from "node:path";
 import { SubscribeStateChangeReply } from "./types/generated/timingsystem/SubscribeStateChangeReply";
 import stableHash from "stable-hash";
 
-const packageDefinition = protoLoader.loadSync("./proto/timing-system.proto");
+const packageDefinition = protoLoader.loadSync("./resources/proto/timing-system.proto");
 
 const proto = grpc.loadPackageDefinition(
   packageDefinition
@@ -17,7 +17,7 @@ const proto = grpc.loadPackageDefinition(
 async function getGoogleApiAuthorization() {
   const client = await authenticate({
     scopes: "https://www.googleapis.com/auth/spreadsheets",
-    keyfilePath: path.join(process.cwd(), "secrets/google-api-secret.json"),
+    keyfilePath: path.join(process.cwd(), "resources", "secrets", "google-api-secret.json"),
   });
 
   if (!client.credentials.access_token) {

@@ -15,6 +15,7 @@
     "timing-system-front",
     "timing-system-front-tauri",
     "timing-system-server",
-    "timing-system-front-gateway"
+    "timing-system-front-gateway",
+    "timing-system-google-spreadsheet-exporter"
   ]
 }

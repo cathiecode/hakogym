@@ -2,17 +2,18 @@
   "name": "timing-system-google-spreadsheet-exporter",
   "version": "0.1.0",
   "description": "",
-  "main": "index.js",
+  "main": "build/index.js",
   "type": "module",
   "scripts": {
     "build": "node scripts/build.js",
-    "dev": "npm run build && cd build && node main.js"
+    "dev": "npm run build && cd build && node index.js"
   },
   "author": "cathiecode",
   "license": "ISC",
   "devDependencies": {
     "@types/fs-extra": "^11.0.1",
     "@types/node": "^18.14.0",
+    "esbuild": "^0.17.10",
     "fs-extra": "^11.1.0",
     "typescript": "^4.9.5"
   },
