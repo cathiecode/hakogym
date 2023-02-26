@@ -5,8 +5,6 @@ import { toast, Toaster } from "react-hot-toast";
 
 import styles from "./App.module.css";
 
-const SERVICES = ["main"] as const;
-
 const StatusIcon = {
   Spawned: <span className={`${styles.statusIcon} ${styles.spawned}`}></span>,
   Exited: <span className={`${styles.statusIcon} ${styles.exited}`}></span>,
@@ -14,9 +12,11 @@ const StatusIcon = {
 };
 
 function App() {
-  const [serviceState, setServiceState] = useState<
+  const [services, setServices] = useState(new Map<string, "Spawned" | "Exited">());
+
+  /*const [serviceState, setServiceState] = useState<
     Record<typeof SERVICES[number], "Spawned" | "Exited" | undefined>
-  >({} as any);
+  >({} as any);*/
 
   useEffect(() => {
     const unlisten = listen("service_event", (event) => {
@@ -27,10 +27,7 @@ function App() {
       toast(`${payload.service}: ${payload.type}${payload.type === "Message" ? payload.message : ""}`);
 
       if (payload.type === "Spawned" || payload.type === "Exited") {
-        setServiceState((current) => ({
-          ...current,
-          [payload.service]: payload.type,
-        }));
+        setServices(current => new Map([...current, [payload.service, payload.type]]));
       }
     });
 
@@ -49,12 +46,12 @@ function App() {
 
       <table className={styles.statusTable}>
         <tbody>
-          {SERVICES.map((serviceName, i) => (
+          {[...services.entries()].map(([serviceName, serviceStatus], i) => (
             <tr key={i}>
               <th>{serviceName}</th>
               <td>
-                {StatusIcon[serviceState[serviceName] ?? "unknown"]}
-                {serviceState[serviceName] ?? "UNKNOWN"}
+                {StatusIcon[serviceStatus ?? "unknown"]}
+                {serviceStatus}
               </td>
             </tr>
           ))}

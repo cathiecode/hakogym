@@ -10,7 +10,10 @@ use tauri::Manager;
 async fn main() {
     let (tx, rx) = mpsc::channel();
 
-    launch(LaunchConfiguration {}, tx);
+    let path = std::env::current_dir().unwrap();
+    println!("starting dir: {}", path.display());
+
+    // launch(LaunchConfiguration {}, tx);
 
     tauri::Builder::default()
         .setup(|app| {
@@ -26,6 +29,9 @@ async fn main() {
             });
             Ok(())
         })
+        .invoke_handler(tauri::generate_handler!(
+            launch
+        ))
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
@@ -77,15 +83,37 @@ fn start_service(
     });
 }
 
+#[tauri::command]
 fn launch(config: LaunchConfiguration, message_channel: mpsc::Sender<ServiceEvent>) {
     println!("launch");
 
     start_service(
-        "main",
+        "Main",
         {
             let command = Command::new(Path::new(".").join("data").join("timing-system.exe"));
             command
         },
         &message_channel,
     );
+
+    /*start_service(
+        "GUI",
+        {
+            let command = Command::new(Path::new(".").join("data").join("timing-system-front.exe"));
+            command
+        },
+        &message_channel,
+    );
+
+    start_service(
+        "Google Spreadsheet Exporter",
+        {
+            let command = Command::new(Path::new(".").join("data").join("node18").join("node.exe"));
+            command.args([Path::new(".").join("data").join("timing-system-google-spreadsheet-exporter")]);
+            command
+        },
+        &message_channel
+    )
+    */
 }
+
