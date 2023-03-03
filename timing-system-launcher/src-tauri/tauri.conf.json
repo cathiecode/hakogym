@@ -59,10 +59,10 @@
     "windows": [
       {
         "fullscreen": false,
-        "height": 600,
         "resizable": true,
         "title": "HAS Timing System Launcher",
-        "width": 800
+        "width": 450,
+        "height": 800
       }
     ]
   }

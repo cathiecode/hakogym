@@ -3,19 +3,17 @@
 }
 .statusTable {
   width: 100%;
-  font-size: 24px;
+  font-size: 16px;
 }
 
 .statusTable th {
   text-align: right;
   width: 50%;
-  padding: 0 32px;
 }
 
 .statusTable td {
   text-align: left;
   width: 50%;
-  padding: 0 32px;
   vertical-align: middle;
 }
 
