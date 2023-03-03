@@ -6,9 +6,13 @@ type FormData = {
   spreadsheet_id: string;
 };
 
-const launch = async () => {
-  console.log(await invoke('launch_request', {config: {}}));
-}
+type LaunchConfig = {
+  google_spreadsheet_id: string;
+};
+
+const launch = async (config: LaunchConfig) => {
+  console.log(await invoke("launch_request", { config: config }));
+};
 
 export default function StartPage() {
   const {
@@ -23,8 +27,10 @@ export default function StartPage() {
     navigate("/status");
     setTimeout(() => {
       console.log("Launch");
-      launch();
-    }, 1000) // Dirty hack
+      launch({
+        google_spreadsheet_id: data.spreadsheet_id,
+      });
+    }, 1000); // Dirty hack
   });
 
   return (

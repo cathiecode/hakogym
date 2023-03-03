@@ -23,7 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 
-secrets/*
+resources/secrets
 build
 deps
 build.zip

@@ -3,12 +3,18 @@
     windows_subsystem = "windows"
 )]
 
-use std::{path::Path, process::Command, sync::mpsc::{self, SyncSender}, thread, time::Duration};
 use once_cell::sync::OnceCell;
-use tauri::{Manager, App};
+use std::{
+    path::Path,
+    process::Command,
+    sync::mpsc::{self, SyncSender},
+    thread,
+    time::Duration,
+};
+use tauri::{App, Manager};
 
 struct AppGlobal {
-    service_message_sender: SyncSender<ServiceEvent>
+    service_message_sender: SyncSender<ServiceEvent>,
 }
 
 #[tokio::main]
@@ -19,13 +25,15 @@ async fn main() {
     let (tx, rx) = mpsc::sync_channel(4);
 
     let app = tauri::Builder::default()
-        .manage(AppGlobal {service_message_sender: tx})
+        .manage(AppGlobal {
+            service_message_sender: tx,
+        })
         .setup(|app| {
             let app_handle = app.handle();
             tokio::spawn(async move {
                 loop {
                     let message = rx.recv();
-        
+
                     if let Ok(event) = message {
                         app_handle.emit_all("service_event", event);
                     }
@@ -43,7 +51,9 @@ async fn main() {
 }
 
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
-struct LaunchConfiguration {}
+struct LaunchConfiguration {
+    google_spreadsheet_id: String,
+}
 
 type Service = String;
 
@@ -110,7 +120,11 @@ fn launch(config: LaunchConfiguration, message_channel: mpsc::SyncSender<Service
     start_service(
         "GUI",
         {
-            let command = Command::new(Path::new(".").join("data").join("timing-system-front-tauri.exe"));
+            let command = Command::new(
+                Path::new(".")
+                    .join("data")
+                    .join("timing-system-front-tauri.exe"),
+            );
             command
         },
         &message_channel,
@@ -119,11 +133,13 @@ fn launch(config: LaunchConfiguration, message_channel: mpsc::SyncSender<Service
     start_service(
         "Google Spreadsheet Exporter",
         {
-            let mut command = Command::new(Path::new(".").join("data").join("node18").join("node.exe"));
+            let mut command =
+                Command::new(Path::new(".").join("data").join("node18").join("node.exe"));
             command.args([Path::new(".")
                 .join("data")
                 .join("timing-system-google-spreadsheet-exporter")
-                .join("main.js")]);
+                .join("main.js")])
+                .arg(config.google_spreadsheet_id);
             command
         },
         &message_channel,
