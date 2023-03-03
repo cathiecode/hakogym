@@ -122,7 +122,8 @@ fn launch(config: LaunchConfiguration, message_channel: mpsc::SyncSender<Service
             let mut command = Command::new(Path::new(".").join("data").join("node18").join("node.exe"));
             command.args([Path::new(".")
                 .join("data")
-                .join("timing-system-google-spreadsheet-exporter")]);
+                .join("timing-system-google-spreadsheet-exporter")
+                .join("main.js")]);
             command
         },
         &message_channel,

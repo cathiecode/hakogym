@@ -24,7 +24,7 @@ const run = (cwd, command, args = []) => {
     "proto-loader-gen-types",
     "--",
     "--includeDirs",
-    path.join("..", "proto"),
+    path.join("..", "resources", "proto"),
     "--outDir",
     path.join("src", "types", "generated"),
     "--grpcLib",
@@ -33,11 +33,4 @@ const run = (cwd, command, args = []) => {
   ]);
 
   run(".", "npm", ["exec", "tsc"]);
-
-  // run(".", "npm", ["exec", "esbuild", "--", "src/main.ts", "--bundle", "--platform=node", "--outfile=" + path.join("build", "index.js"), "--format=cjs"])
-
-  mkdirSync(path.join("build", "resources"));
-  copySync("../proto/", path.join("build", "resources", "proto"));
-  copySync("../secrets/", path.join("build", "resources", "secrets"));
-
 })().catch(console.error);
