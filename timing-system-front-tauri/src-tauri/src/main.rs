@@ -95,6 +95,196 @@ async fn stop(timestamp: u64, track_id: String, car_id: Option<String>) -> Resul
 }
 
 #[tauri::command]
+async fn red_flag(timestamp: u64, track_id: String) -> Result<(), String> {
+    let mut connection = get_connection().await?;
+    let request = proto::RedFlagRequest {
+        timestamp,
+        track_id,
+    };
+    connection
+        .red_flag(request)
+        .await
+        .map_err(|error| error.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn mark_pylon_touch(timestamp: u64, track_id: String, car_id: String) -> Result<(), String> {
+    let mut connection = get_connection().await?;
+    let request = proto::RunnningCarSpecificRequest {
+        timestamp,
+        track_id,
+        car_id
+    };
+    connection
+        .mark_pylon_touch(request)
+        .await
+        .map_err(|error| error.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn remove_pylon_touch(timestamp: u64, track_id: String, car_id: String) -> Result<(), String> {
+    let mut connection = get_connection().await?;
+    let request = proto::RunnningCarSpecificRequest {
+        timestamp,
+        track_id,
+        car_id
+    };
+    connection
+        .remove_pylon_touch(request)
+        .await
+        .map_err(|error| error.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn mark_derailment(timestamp: u64, track_id: String, car_id: String) -> Result<(), String> {
+    let mut connection = get_connection().await?;
+    let request = proto::RunnningCarSpecificRequest {
+        timestamp,
+        track_id,
+        car_id
+    };
+    connection
+        .mark_derailment(request)
+        .await
+        .map_err(|error| error.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn remove_derailment(timestamp: u64, track_id: String, car_id: String) -> Result<(), String> {
+    let mut connection = get_connection().await?;
+    let request = proto::RunnningCarSpecificRequest {
+        timestamp,
+        track_id,
+        car_id
+    };
+    connection
+        .remove_derailment(request)
+        .await
+        .map_err(|error| error.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn did_not_finished(timestamp: u64, track_id: String, car_id: String) -> Result<(), String> {
+    let mut connection = get_connection().await?;
+    let request = proto::RunnningCarSpecificRequest {
+        timestamp,
+        track_id,
+        car_id
+    };
+    connection
+        .mark_dnf(request)
+        .await
+        .map_err(|error| error.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn miss_course(timestamp: u64, track_id: String, car_id: String) -> Result<(), String> {
+    let mut connection = get_connection().await?;
+    let request = proto::RunnningCarSpecificRequest {
+        timestamp,
+        track_id,
+        car_id
+    };
+    connection
+        .mark_miss_course(request)
+        .await
+        .map_err(|error| error.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn mark_dnf_to_record(timestamp: u64, record_id: String) -> Result<(), String> {
+    let mut connection = get_connection().await?;
+    let request = proto::RecordSpecificRequest {
+        timestamp,
+        record_id
+    };
+    connection
+        .mark_dnf_to_record(request)
+        .await
+        .map_err(|error| error.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn mark_miss_course_to_record(timestamp: u64, record_id: String) -> Result<(), String> {
+    let mut connection = get_connection().await?;
+    let request = proto::RecordSpecificRequest {
+        timestamp,
+        record_id
+    };
+    connection
+        .mark_miss_course_to_record(request)
+        .await
+        .map_err(|error| error.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn remove_record(timestamp: u64, record_id: String) -> Result<(), String> {
+    let mut connection = get_connection().await?;
+    let request = proto::RecordSpecificRequest {
+        timestamp,
+        record_id
+    };
+    connection
+        .remove_record(request)
+        .await
+        .map_err(|error| error.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn recovery_record(timestamp: u64, record_id: String) -> Result<(), String> {
+    let mut connection = get_connection().await?;
+    let request = proto::RecordSpecificRequest {
+        timestamp,
+        record_id
+    };
+    connection
+        .recovery_record(request)
+        .await
+        .map_err(|error| error.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn change_record_pylon_touch_count(timestamp: u64, record_id: String, count: u32) -> Result<(), String> {
+    let mut connection = get_connection().await?;
+    let request = proto::ChangeRecordPylonTouchCountRequest {
+        timestamp,
+        record_id,
+        count
+    };
+    connection
+        .change_record_pylon_touch_count(request)
+        .await
+        .map_err(|error| error.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn change_record_derailment_count(timestamp: u64, record_id: String, count: u32) -> Result<(), String> {
+    let mut connection = get_connection().await?;
+    let request = proto::ChangeRecordDerailmentCountRequest {
+        timestamp,
+        record_id,
+        count
+    };
+    connection
+        .change_record_derailment_count(request)
+        .await
+        .map_err(|error| error.to_string())?;
+    Ok(())
+}
+
+/*#[tauri::command]
 async fn get_current_tracks() -> Result<Vec<String>, String> {
     println!("Fetching competition...");
     let mut connection = get_connection().await?;
@@ -104,7 +294,7 @@ async fn get_current_tracks() -> Result<Vec<String>, String> {
         .await
         .map_err(|error| "Failed to get tracks!")?;
     Ok(result.into_inner().track_id)
-}
+}*/
 
 #[tauri::command]
 async fn get_state_tree() -> Result<String, String> {
@@ -133,7 +323,10 @@ where
 
     while let Some(message) = subscription.message().await.ok() {
         println!("state changed.");
-        let state = message.map_or("".to_owned(), |message| message.state);
+        let state = message.map_or("".to_owned(), |message| {
+            println!("State check error: {}", message.state);
+            message.state
+        });
         manager.emit_all("state_changed", state);
     }
     Ok(())
@@ -157,11 +350,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .invoke_handler(tauri::generate_handler!(
             greet,
             create_competition,
-            get_current_tracks,
             get_state_tree,
             register_next_car,
             start,
-            stop
+            stop,
+            mark_pylon_touch,
+            remove_pylon_touch,
+            mark_derailment,
+            remove_derailment,
+            did_not_finished,
+            miss_course,
+            mark_dnf_to_record,
+            mark_miss_course_to_record,
+            remove_record,
+            recovery_record,
+            change_record_pylon_touch_count,
+            change_record_derailment_count
         ))
         .run(tauri::generate_context!())?;
     Ok(())

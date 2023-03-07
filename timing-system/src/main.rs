@@ -2,26 +2,30 @@ mod server;
 
 use std::{
     collections::{HashMap, VecDeque},
-    sync::Arc,
+    mem::swap,
+    sync::Arc, time,
 };
 
+use serde_with::serde_as;
 use tokio::sync::Mutex;
 
 use anyhow::Result;
 
 use async_trait::async_trait;
-use chrono::{TimeZone, Utc};
+use chrono::{TimeZone, Utc, naive::serde::ts_milliseconds};
+use chrono::serde::ts_milliseconds_option;
 use serde::{
     ser::{SerializeStruct, SerializeStructVariant},
-    Serialize,
+    Deserialize, Serialize,
 };
 
+use nanoid::nanoid;
 use server::proto::timing_system_server::{TimingSystem, TimingSystemServer};
 use thiserror::Error;
 
-use log::{trace, debug, error};
+use log::{debug, error, trace};
 
-type Duration = chrono::Duration;
+type Duration = time::Duration;
 type TimeStamp = chrono::DateTime<chrono::Utc>;
 
 trait Replayable {
@@ -201,13 +205,13 @@ impl Serialize for TimerState {
             TimerState::Stopped { time } => {
                 let mut state = serializer.serialize_struct("TimerState", 2)?;
                 state.serialize_field("type", "Stopped")?;
-                state.serialize_field("time", &time.num_milliseconds())?;
+                state.serialize_field("time", &time.as_millis())?;
                 state.end()
             }
             TimerState::Specified { time } => {
                 let mut state = serializer.serialize_struct("TimerState", 2)?;
                 state.serialize_field("type", "Specified")?;
-                state.serialize_field("time", &time.num_milliseconds())?;
+                state.serialize_field("time", &time.as_millis())?;
                 state.end()
             }
         }
@@ -236,7 +240,7 @@ impl Timer {
         if let TimerState::Started { start_date } = self.state {
             trace!("Timer stopped at {}", date);
             self.state = TimerState::Stopped {
-                time: date - start_date,
+                time: (date - start_date).to_std()?,
             };
             Ok(())
         } else {
@@ -247,7 +251,7 @@ impl Timer {
     fn get_time(&self, date: TimeStamp) -> Result<Duration> {
         match self.state {
             TimerState::HaveNotStarted => Err(AppError::TimerHaveNotStarted.into()),
-            TimerState::Started { start_date } => Ok(date - start_date),
+            TimerState::Started { start_date } => Ok((date - start_date).to_std()?),
             TimerState::Stopped { time } => Ok(time),
             TimerState::Specified { time } => Ok(time),
         }
@@ -290,28 +294,7 @@ impl Serialize for CompetitionEntryId {
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Hash)]
-struct TrackId {
-    id: String,
-}
-
-impl Serialize for TrackId {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_str(&self.id)
-    }
-}
-
-impl TrackId {
-    fn new(id: &str) -> Self {
-        Self { id: id.to_owned() }
-    }
-    fn get(&self) -> &str {
-        &self.id
-    }
-}
+type TrackId = String;
 
 #[derive(Clone, Eq, PartialEq, Hash)]
 struct CompetitionConfigurationId {
@@ -327,10 +310,21 @@ impl CompetitionConfigurationId {
     }
 }
 
+type ResultId = String;
+
+/*
+#[derive(Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+struct TimerId {
+    id: String
+}
+*/
+
 #[derive(Serialize)]
 struct RunningCar {
     timer: Timer,
     id: CompetitionEntryId,
+    touched_pylon_count: u32,
+    derailment_count: u32,
 }
 
 impl RunningCar {
@@ -338,6 +332,8 @@ impl RunningCar {
         RunningCar {
             timer: Timer::new(),
             id,
+            touched_pylon_count: 0,
+            derailment_count: 0,
         }
     }
 
@@ -351,6 +347,26 @@ impl RunningCar {
 
     fn time(&self, date: TimeStamp) -> Result<Duration> {
         self.timer.get_time(date)
+    }
+
+    fn add_touched_pylon_count(&mut self) -> Result<()> {
+        self.touched_pylon_count += 1;
+        Ok(())
+    }
+
+    fn remove_touched_pylon_count(&mut self) -> Result<()> {
+        self.touched_pylon_count -= 1;
+        Ok(())
+    }
+
+    fn add_derailment_count(&mut self) -> Result<()> {
+        self.derailment_count += 1;
+        Ok(())
+    }
+
+    fn remove_derailment_count(&mut self) -> Result<()> {
+        self.derailment_count -= 1;
+        Ok(())
     }
 
     /*fn edit_time(&mut self, time: Duration) -> Result<()> {
@@ -402,7 +418,8 @@ impl Track {
         &mut self,
         date: TimeStamp,
         competition_entry_id: Option<CompetitionEntryId>,
-    ) -> Result<TimeResult> {
+        result_id: ResultId,
+    ) -> Result<Record> {
         let (car_index, car) = if let Some(competition_entry_id) = competition_entry_id {
             self.find_running_car(&competition_entry_id)?
         } else {
@@ -419,10 +436,107 @@ impl Track {
             .remove(car_index)
             .ok_or(AppError::LogicError)?;
 
-        Ok(TimeResult {
+        Ok(Record {
+            id: result_id,
+            state: RecordState::Checkered,
             duration: car.time(date)?,
+            pylon_touch_count: car.touched_pylon_count,
+            derailment_count: car.derailment_count,
             competition_entry_id: car.get_id().clone(),
         })
+    }
+
+    pub fn red_flag(&mut self, date: TimeStamp) -> Result<(), anyhow::Error> {
+        let mut red_flagged_cars = VecDeque::new();
+        swap(&mut self.running_cars, &mut red_flagged_cars);
+        // TODO?: レッドフラグを受けた車を自動処理する
+        Ok(())
+    }
+
+    pub fn miss_course(
+        &mut self,
+        date: TimeStamp,
+        competition_entry_id: &CompetitionEntryId,
+        result_id: ResultId,
+    ) -> Result<Record> {
+        let (car_index, car) = self.find_running_car(&competition_entry_id)?;
+
+        car.stop(date)?;
+
+        let car = self
+            .running_cars
+            .remove(car_index)
+            .ok_or(AppError::LogicError)?;
+
+        Ok(Record {
+            id: result_id,
+            state: RecordState::MissCourse,
+            duration: car.time(date)?,
+            pylon_touch_count: car.touched_pylon_count,
+            derailment_count: car.derailment_count,
+            competition_entry_id: competition_entry_id.clone(),
+        })
+    }
+
+    pub fn did_not_finished(
+        &mut self,
+        date: TimeStamp,
+        competition_entry_id: &CompetitionEntryId,
+        result_id: ResultId,
+    ) -> Result<Record> {
+        let (car_index, car) = self.find_running_car(&competition_entry_id)?;
+
+        car.stop(date)?;
+
+        let car = self
+            .running_cars
+            .remove(car_index)
+            .ok_or(AppError::LogicError)?;
+
+        Ok(Record {
+            id: result_id,
+            state: RecordState::DidNotFinished,
+            duration: car.time(date)?,
+            pylon_touch_count: car.touched_pylon_count,
+            derailment_count: car.derailment_count,
+            competition_entry_id: competition_entry_id.clone(),
+        })
+    }
+
+    pub fn add_touched_pylon_count(
+        &mut self,
+        competition_entry_id: &CompetitionEntryId,
+    ) -> Result<()> {
+        let (car_index, car) = self.find_running_car(&competition_entry_id)?;
+        car.add_touched_pylon_count()?;
+        Ok(())
+    }
+
+    pub fn remove_touched_pylon_count(
+        &mut self,
+        competition_entry_id: &CompetitionEntryId,
+    ) -> Result<()> {
+        let (car_index, car) = self.find_running_car(&competition_entry_id)?;
+        car.remove_touched_pylon_count()?;
+        Ok(())
+    }
+
+    pub fn add_derailment_count(
+        &mut self,
+        competition_entry_id: &CompetitionEntryId,
+    ) -> Result<()> {
+        let (car_index, car) = self.find_running_car(&competition_entry_id)?;
+        car.add_derailment_count()?;
+        Ok(())
+    }
+
+    pub fn remove_derailment_count(
+        &mut self,
+        competition_entry_id: &CompetitionEntryId,
+    ) -> Result<()> {
+        let (car_index, car) = self.find_running_car(&competition_entry_id)?;
+        car.remove_derailment_count()?;
+        Ok(())
     }
 
     fn find_running_car(
@@ -441,12 +555,28 @@ impl Track {
     }
 }
 
-struct TimeResult {
-    duration: Duration,
-    competition_entry_id: CompetitionEntryId,
+#[derive(Serialize)]
+enum RecordState {
+    Checkered,
+    MissCourse,
+    DidNotStarted,
+    DidNotFinished,
+    Removed,
 }
 
-impl TimeResult {
+#[serde_as]
+#[derive(Serialize)]
+struct Record {
+    id: ResultId,
+    state: RecordState,
+    #[serde_as(as = "serde_with::DurationMilliSeconds<f64>")] // FIXME
+    duration: Duration,
+    competition_entry_id: CompetitionEntryId,
+    pylon_touch_count: u32,
+    derailment_count: u32
+}
+
+impl Record {
     fn get_duration(&self) -> Duration {
         self.duration
     }
@@ -456,7 +586,7 @@ impl TimeResult {
     }
 }
 
-impl Serialize for TimeResult {
+/*impl Serialize for Record {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -466,10 +596,10 @@ impl Serialize for TimeResult {
         state.serialize_field("competition_entry_id", &self.competition_entry_id)?;
         state.end()
     }
-}
+}*/
 
 struct Competition {
-    results: Vec<TimeResult>,
+    records: HashMap<ResultId, Record>,
     tracks: HashMap<TrackId, Track>,
     on_result: Option<Box<dyn Fn() -> () + Sync + Send>>,
 }
@@ -480,7 +610,7 @@ impl Serialize for Competition {
         S: serde::Serializer,
     {
         let mut state = serializer.serialize_struct("Competition", 2)?;
-        state.serialize_field("results", &self.results)?;
+        state.serialize_field("records", &self.records)?;
         state.serialize_field("tracks", &self.tracks)?;
         state.end()
     }
@@ -495,8 +625,59 @@ enum CompetitionEventKind {
         track_id: TrackId,
     },
     Stop {
+        result_id: ResultId,
         track_id: TrackId,
         competition_entry_id: Option<CompetitionEntryId>,
+    },
+    RedFlag {
+        track_id: TrackId,
+    },
+    AddPylonTouch {
+        track_id: TrackId,
+        competition_entry_id: CompetitionEntryId,
+    },
+    RemovePylonTouch {
+        track_id: TrackId,
+        competition_entry_id: CompetitionEntryId,
+    },
+    AddDerailment {
+        track_id: TrackId,
+        competition_entry_id: CompetitionEntryId,
+    },
+    RemoveDerailment {
+        track_id: TrackId,
+        competition_entry_id: CompetitionEntryId,
+    },
+    MarkDNF {
+        result_id: ResultId,
+        track_id: TrackId,
+        competition_entry_id: CompetitionEntryId,
+    },
+    MarkMissCourse {
+        result_id: ResultId,
+        track_id: TrackId,
+        competition_entry_id: CompetitionEntryId,
+    },
+
+    MarkDNFToRecord {
+        result_id: ResultId,
+    },
+    MarkMissCourseToRecord {
+        result_id: ResultId,
+    },
+    RemoveRecord {
+        result_id: ResultId,
+    },
+    RecoveryRecord {
+        result_id: ResultId,
+    },
+    ChangeRecordPylonTouchCount {
+        result_id: ResultId,
+        count: u32
+    },
+    ChangeRecordDerailmentCount {
+        result_id: ResultId,
+        count: u32
     },
 }
 
@@ -545,17 +726,140 @@ impl Competition {
         timestamp: TimeStamp,
         track_id: &TrackId,
         competition_entry_id: Option<&CompetitionEntryId>,
+        result_id: &ResultId,
     ) -> Result<(), anyhow::Error> {
         let track = self.get_track(track_id)?;
-        let result = track.stop(timestamp, competition_entry_id.cloned())?;
-        self.results.push(result);
+        let result = track.stop(timestamp, competition_entry_id.cloned(), result_id.clone())?;
+        self.records.insert(result_id.clone(), result);
         Ok(())
     }
+
+    fn add_touched_pylon_count(
+        &mut self,
+        track_id: &TrackId,
+        competition_entry_id: &CompetitionEntryId,
+    ) -> Result<(), anyhow::Error> {
+        let mut track = self.get_track(track_id)?;
+        track.add_touched_pylon_count(competition_entry_id)?;
+        Ok(())
+    }
+
+    fn remove_touched_pylon_count(
+        &mut self,
+        track_id: &TrackId,
+        competition_entry_id: &CompetitionEntryId,
+    ) -> Result<(), anyhow::Error> {
+        let mut track = self.get_track(track_id)?;
+        track.remove_touched_pylon_count(competition_entry_id)?;
+        Ok(())
+    }
+
+    fn add_derailment_count(
+        &mut self,
+        track_id: &TrackId,
+        competition_entry_id: &CompetitionEntryId,
+    ) -> Result<(), anyhow::Error> {
+        let mut track = self.get_track(track_id)?;
+        track.add_derailment_count(competition_entry_id);
+        Ok(())
+    }
+
+    fn remove_derailment_count(
+        &mut self,
+        track_id: &TrackId,
+        competition_entry_id: &CompetitionEntryId,
+    ) -> Result<(), anyhow::Error> {
+        let mut track = self.get_track(track_id)?;
+        track.remove_derailment_count(competition_entry_id);
+        Ok(())
+    }
+
+    fn miss_course(
+        &mut self,
+        timestamp: TimeStamp,
+        track_id: &TrackId,
+        competition_entry_id: &CompetitionEntryId,
+        result_id: &ResultId,
+    ) -> Result<(), anyhow::Error> {
+        let track = self.get_track(track_id)?;
+        let result = track.miss_course(timestamp, competition_entry_id, result_id.clone())?;
+
+        self.records.insert(
+            result_id.clone(),
+            result
+        );
+        Ok(())
+    }
+
+    fn did_not_finished(
+        &mut self,
+        timestamp: TimeStamp,
+        track_id: &TrackId,
+        competition_entry_id: &CompetitionEntryId,
+        result_id: &ResultId,
+    ) -> Result<(), anyhow::Error> {
+        let track = self.get_track(track_id)?;
+        let result = track.did_not_finished(timestamp, competition_entry_id, result_id.clone())?;
+
+        self.records.insert(
+            result_id.clone(),
+            result
+        );
+        Ok(())
+    }
+
+    fn red_flag(&mut self, timestamp: TimeStamp, track_id: &TrackId) -> Result<(), anyhow::Error> {
+        let mut track = self.get_track(track_id)?;
+        track.red_flag(timestamp);
+
+        Ok(())
+    }
+
+    fn mark_dnf_to_record(&mut self, record_id: &ResultId) -> Result<(), anyhow::Error> {
+        self.get_record(record_id)?.state = RecordState::DidNotFinished;
+
+        Ok(())
+    }
+
+    fn mark_miss_course_to_record(&mut self, record_id: &ResultId) -> Result<(), anyhow::Error> {
+        self.get_record(record_id)?.state = RecordState::MissCourse;
+
+        Ok(())
+    }
+
+    fn mark_removed_to_record(&mut self, record_id: &ResultId) -> Result<(), anyhow::Error> {
+        self.get_record(record_id)?.state = RecordState::Removed;
+
+        Ok(())
+    }
+
+    fn recovery_record(&mut self, record_id: &ResultId) -> Result<(), anyhow::Error> {
+        self.get_record(record_id)?.state = RecordState::Checkered;
+
+        Ok(())
+    }
+
+    fn change_pylon_touch_count_of_record(&mut self, record_id: &ResultId, count: &u32) -> Result<(), anyhow::Error> {
+        self.get_record(record_id)?.pylon_touch_count = count.clone();
+        Ok(())
+    }
+
+    fn change_derailment_count_of_record(&mut self, record_id: &ResultId, count: &u32) -> Result<(), anyhow::Error> {
+        self.get_record(record_id)?.derailment_count = count.clone();
+        Ok(())
+    }
+
 
     fn get_track<'a>(&'a mut self, track_id: &TrackId) -> Result<&'a mut Track, anyhow::Error> {
         self.tracks
             .get_mut(track_id)
             .ok_or(AppError::NoSuchTrack.into())
+    }
+
+    fn get_record<'a>(&'a mut self, result_id: &ResultId) -> Result<&'a mut Record, anyhow::Error> {
+        self.records
+            .get_mut(result_id)
+            .ok_or(AppError::NoSuchTrack.into()) // TODO NoSuchRecord
     }
 
     fn on_result(mut self, callback: Box<dyn Fn() -> () + Sync + Send>) -> Self {
@@ -576,9 +880,54 @@ impl Replayable for Competition {
             } => self.register_next_car(track_id, competition_entry_id.clone()),
             CompetitionEventKind::Start { track_id } => self.start(event.time_stamp, track_id),
             CompetitionEventKind::Stop {
+                result_id,
                 track_id,
                 competition_entry_id,
-            } => self.stop(event.time_stamp, track_id, competition_entry_id.as_ref()),
+            } => self.stop(
+                event.time_stamp,
+                track_id,
+                competition_entry_id.as_ref(),
+                result_id,
+            ),
+            CompetitionEventKind::RedFlag { track_id } => self.red_flag(event.time_stamp, track_id),
+            CompetitionEventKind::AddPylonTouch {
+                track_id,
+                competition_entry_id,
+            } => self.add_touched_pylon_count(track_id, competition_entry_id),
+            CompetitionEventKind::RemovePylonTouch {
+                track_id,
+                competition_entry_id,
+            } => self.remove_touched_pylon_count(track_id, competition_entry_id),
+            CompetitionEventKind::AddDerailment {
+                track_id,
+                competition_entry_id,
+            } => self.add_derailment_count(track_id, competition_entry_id),
+            CompetitionEventKind::RemoveDerailment {
+                track_id,
+                competition_entry_id,
+            } => self.remove_derailment_count(track_id, competition_entry_id),
+            CompetitionEventKind::MarkDNF {
+                track_id,
+                competition_entry_id,
+                result_id,
+            } => self.did_not_finished(event.time_stamp, track_id, competition_entry_id, result_id),
+            CompetitionEventKind::MarkMissCourse {
+                track_id,
+                competition_entry_id,
+                result_id,
+            } => self.miss_course(event.time_stamp, track_id, competition_entry_id, result_id),
+            CompetitionEventKind::MarkDNFToRecord { result_id } => self.mark_dnf_to_record(result_id),
+            CompetitionEventKind::MarkMissCourseToRecord { result_id } => self.mark_miss_course_to_record(result_id),
+            CompetitionEventKind::RemoveRecord { result_id } => self.mark_removed_to_record(result_id),
+            CompetitionEventKind::RecoveryRecord { result_id } => self.recovery_record(result_id),
+            CompetitionEventKind::ChangeRecordPylonTouchCount {
+                result_id,
+                count
+            } => self.change_pylon_touch_count_of_record(result_id, count),
+            CompetitionEventKind::ChangeRecordDerailmentCount {
+                result_id,
+                count
+            } => self.change_derailment_count_of_record(result_id, count),
         }
     }
 }
@@ -597,11 +946,11 @@ impl CompetitionConfiguration {
     fn build_competition(&self) -> Competition {
         let mut tracks = HashMap::new();
         for (id, config) in self.tracks.iter() {
-            tracks.insert(TrackId { id: id.clone() }, Track::new(config.overlap_limit));
+            tracks.insert(id.clone(), Track::new(config.overlap_limit));
         }
 
         Competition {
-            results: Vec::new(),
+            records: HashMap::new(),
             tracks,
             on_result: None,
         }
@@ -706,7 +1055,7 @@ impl TimingSystemApp {
         self.get_competition()?.command(CompetitionEvent {
             time_stamp: time_stamp_from_unixmsec(time_stamp)?,
             kind: CompetitionEventKind::RegisterNextCar {
-                track_id: TrackId::new(track_id),
+                track_id: track_id.to_string(),
                 competition_entry_id: CompetitionEntryId::new(competition_entry_id),
             },
         });
@@ -718,7 +1067,7 @@ impl TimingSystemApp {
         self.get_competition()?.command(CompetitionEvent::new(
             time_stamp_from_unixmsec(time_stamp)?,
             CompetitionEventKind::Start {
-                track_id: TrackId::new(track_id),
+                track_id: track_id.to_string(),
             },
         ));
 
@@ -731,10 +1080,12 @@ impl TimingSystemApp {
         track_id: &str,
         competition_entry_id: Option<&CompetitionEntryId>,
     ) -> Result<(), anyhow::Error> {
+        let result_id = nanoid!();
         self.get_competition()?.command(CompetitionEvent::new(
             time_stamp_from_unixmsec(time_stamp)?,
             CompetitionEventKind::Stop {
-                track_id: TrackId::new(track_id),
+                result_id,
+                track_id: track_id.to_string(),
                 competition_entry_id: competition_entry_id.cloned(),
             },
         ));
@@ -742,14 +1093,173 @@ impl TimingSystemApp {
         Ok(())
     }
 
-    fn get_current_tracks(&mut self) -> Result<Vec<String>, anyhow::Error> {
-        Ok(self
-            .get_competition()?
-            .get()
-            .tracks
-            .iter()
-            .map(|track| track.0.get().to_owned())
-            .collect::<Vec<String>>())
+    fn red_flag(&mut self, time_stamp: u64, track_id: &str) -> Result<(), anyhow::Error> {
+        self.get_competition()?.command(CompetitionEvent::new(
+            time_stamp_from_unixmsec(time_stamp)?,
+            CompetitionEventKind::RedFlag {
+                track_id: track_id.to_string(),
+            },
+        ));
+
+        Ok(())
+    }
+
+    fn did_not_finished(
+        &mut self,
+        time_stamp: u64,
+        track_id: &str,
+        competition_entry_id: &str,
+    ) -> Result<(), anyhow::Error> {
+        self.get_competition()?.command(CompetitionEvent::new(
+            time_stamp_from_unixmsec(time_stamp)?,
+            CompetitionEventKind::MarkDNF {
+                result_id: nanoid!(),
+                track_id: track_id.to_string(),
+                competition_entry_id: CompetitionEntryId::new(competition_entry_id),
+            },
+        ));
+
+        Ok(())
+    }
+
+    fn miss_course(
+        &mut self,
+        time_stamp: u64,
+        track_id: &str,
+        competition_entry_id: &str,
+    ) -> Result<(), anyhow::Error> {
+        self.get_competition()?.command(CompetitionEvent::new(
+            time_stamp_from_unixmsec(time_stamp)?,
+            CompetitionEventKind::MarkMissCourse {
+                result_id: nanoid!(),
+                track_id: track_id.to_string(),
+                competition_entry_id: CompetitionEntryId::new(competition_entry_id),
+            },
+        ));
+
+        Ok(())
+    }
+
+    fn mark_pylon_touch(
+        &mut self,
+        time_stamp: u64,
+        track_id: &str,
+        competition_entry_id: &str,
+    ) -> Result<(), anyhow::Error> {
+        self.get_competition()?.command(CompetitionEvent::new(
+            time_stamp_from_unixmsec(time_stamp)?,
+            CompetitionEventKind::AddPylonTouch {
+                track_id: track_id.to_string(),
+                competition_entry_id: CompetitionEntryId::new(competition_entry_id),
+            },
+        ));
+
+        Ok(())
+    }
+
+    fn remove_pylon_touch(
+        &mut self,
+        time_stamp: u64,
+        track_id: &str,
+        competition_entry_id: &str,
+    ) -> Result<(), anyhow::Error> {
+        self.get_competition()?.command(CompetitionEvent::new(
+            time_stamp_from_unixmsec(time_stamp)?,
+            CompetitionEventKind::RemovePylonTouch {
+                track_id: track_id.to_string(),
+                competition_entry_id: CompetitionEntryId::new(competition_entry_id),
+            },
+        ));
+
+        Ok(())
+    }
+
+    fn add_derailment_count(
+        &mut self,
+        time_stamp: u64,
+        track_id: &str,
+        competition_entry_id: &str,
+    ) -> Result<(), anyhow::Error> {
+        self.get_competition()?.command(CompetitionEvent::new(
+            time_stamp_from_unixmsec(time_stamp)?,
+            CompetitionEventKind::AddDerailment {
+                track_id: track_id.to_string(),
+                competition_entry_id: CompetitionEntryId::new(competition_entry_id),
+            },
+        ));
+
+        Ok(())
+    }
+
+    fn remove_derailment_count(
+        &mut self,
+        time_stamp: u64,
+        track_id: &str,
+        competition_entry_id: &str,
+    ) -> Result<(), anyhow::Error> {
+        self.get_competition()?.command(CompetitionEvent::new(
+            time_stamp_from_unixmsec(time_stamp)?,
+            CompetitionEventKind::RemoveDerailment {
+                track_id: track_id.to_string(),
+                competition_entry_id: CompetitionEntryId::new(competition_entry_id),
+            },
+        ));
+
+        Ok(())
+    }
+
+    fn mark_dnf_to_record(&mut self, time_stamp: u64, record_id: &str) -> Result<(), anyhow::Error> {
+        self.get_competition()?.command(CompetitionEvent::new(
+            time_stamp_from_unixmsec(time_stamp)?,
+            CompetitionEventKind::MarkDNFToRecord { result_id: record_id.to_string() }
+        ));
+
+        Ok(())
+    }
+
+    fn mark_miss_course_to_record(&mut self, time_stamp: u64, record_id: &str) -> Result<(), anyhow::Error> {
+        self.get_competition()?.command(CompetitionEvent::new(
+            time_stamp_from_unixmsec(time_stamp)?,
+            CompetitionEventKind::MarkMissCourseToRecord { result_id: record_id.to_string() }
+        ));
+
+        Ok(())
+    }
+
+    fn remove_record(&mut self, time_stamp: u64, record_id: &str) -> Result<(), anyhow::Error> {
+        self.get_competition()?.command(CompetitionEvent::new(
+            time_stamp_from_unixmsec(time_stamp)?,
+            CompetitionEventKind::RemoveRecord { result_id: record_id.to_string() }
+        ));
+
+        Ok(())
+    }
+
+    fn recovery_record(&mut self, time_stamp: u64, record_id: &str) -> Result<(), anyhow::Error> {
+        self.get_competition()?.command(CompetitionEvent::new(
+            time_stamp_from_unixmsec(time_stamp)?,
+            CompetitionEventKind::RecoveryRecord { result_id: record_id.to_string() }
+        ));
+
+        Ok(())
+    }
+
+    fn change_record_pylon_touch_count(&mut self, time_stamp: u64, record_id: &str, count: u32) -> Result<(), anyhow::Error> {
+        self.get_competition()?.command(CompetitionEvent::new(
+            time_stamp_from_unixmsec(time_stamp)?,
+            CompetitionEventKind::ChangeRecordPylonTouchCount { result_id: record_id.to_string(), count }
+        ));
+
+        Ok(())
+    }
+
+    fn change_derailment_count_of_record(&mut self, time_stamp: u64, record_id: &str, count: u32) -> Result<(), anyhow::Error> {
+        self.get_competition()?.command(CompetitionEvent::new(
+            time_stamp_from_unixmsec(time_stamp)?,
+            CompetitionEventKind::ChangeRecordDerailmentCount { result_id: record_id.to_string(), count }
+        ));
+
+        Ok(())
     }
 
     fn get_registered_next_car(&mut self, track_id: &str) -> Result<Option<String>, anyhow::Error> {
@@ -757,21 +1267,24 @@ impl TimingSystemApp {
             .get_competition()?
             .get()
             .tracks
-            .get(&TrackId::new(track_id))
+            .get(track_id)
             .ok_or(AppError::NoSuchTrack)?
             .pending_car
             .as_ref()
             .map(|car| car.get_id().get().to_owned()))
     }
 
-    fn get_results<'a>(&'a mut self) -> Result<&'a [TimeResult], anyhow::Error> {
-        Ok(self.get_competition()?.get().results.as_slice())
-    }
+    /*fn get_records<'a>(&'a mut self) -> Result<&'a [Record], anyhow::Error> {
+        Ok(self.get_competition()?.get().records.as_slice())
+    }*/
 
     fn get_state_tree(&mut self) -> Result<String, anyhow::Error> {
-        Ok(serde_json::to_string(self.get_competition()?.get())
-            .unwrap_or_else(|error| error.to_string()))
+        Ok(serde_json::to_string(self.get_competition()?.get())?)
     }
+
+    /*fn command(&mut self, command: CompetitionEvent) -> Result<(), anyhow::Error> {
+        Ok(self.get_competition()?.command(command))
+    }*/
 }
 
 #[tokio::main]

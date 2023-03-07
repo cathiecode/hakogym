@@ -6,9 +6,12 @@ import google from "googleapis";
 import { authenticate } from "@google-cloud/local-auth";
 import path from "node:path";
 import { SubscribeStateChangeReply } from "./types/generated/timingsystem/SubscribeStateChangeReply";
+import { StateTree } from "../../timing-system-common/types";
 import stableHash from "stable-hash";
 
-const packageDefinition = protoLoader.loadSync("./resources/proto/timing-system.proto");
+const packageDefinition = protoLoader.loadSync(
+  "./resources/proto/timing-system.proto"
+);
 
 const proto = grpc.loadPackageDefinition(
   packageDefinition
@@ -17,7 +20,12 @@ const proto = grpc.loadPackageDefinition(
 async function getGoogleApiAuthorization() {
   const client = await authenticate({
     scopes: "https://www.googleapis.com/auth/spreadsheets",
-    keyfilePath: path.join(process.cwd(), "resources", "secrets", "google-api-secret.json"),
+    keyfilePath: path.join(
+      process.cwd(),
+      "resources",
+      "secrets",
+      "google-api-secret.json"
+    ),
   });
 
   if (!client.credentials.access_token) {
@@ -72,19 +80,24 @@ export default async function main() {
 
       console.log("Received change.");
 
-      const state = JSON.parse(data.state);
+      const state = JSON.parse(data.state) as StateTree;
 
-      const resultHash = stableHash(state.results);
+      const resultHash = stableHash(state.records);
 
       if (resultHash === lastUpdatedResultHash) {
         console.log("Result did not changed. skipping upload");
         return;
       }
 
-      const values = state.results.map((result: {duration: number, competition_entry_id: string}) => [
-        result.competition_entry_id,
-        result.duration,
-      ]);
+      const values = Object.values(state.records).map(
+        (result) => [
+          result.competition_entry_id,
+          result.duration,
+          result.pylon_touch_count,
+          result.derailment_count,
+          result.state,
+        ]
+      );
 
       await gsheets.spreadsheets.values.update({
         spreadsheetId: spreadsheetId,

@@ -1,13 +1,76 @@
-@import "water.css";
+@import "normalize.css";
 
 body {
   max-width: unset;
 }
 
 .App {
-  /*-webkit-user-select: none;*/
+  font-family: monospace;
 }
 
 .App td, .App th {
   vertical-align: middle;
+}
+
+.table {
+  width: 100%;
+}
+
+.row--pending {
+  background-color: #ccf !important;
+}
+
+.row--running {
+  animation: anim_row--running 1000ms linear infinite both;
+}
+
+@keyframes anim_row--running {
+  from {
+    background-color: #afa;
+  }
+
+  to {
+    background-color: #fff;
+  }
+}
+
+.confirmationDialog {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+
+  text-align: center;
+
+  font-size: 24px;
+
+  color: #fff;
+  background-color: rgba(0, 0, 0, 0.9);
+}
+
+.confirmationDialog__cancel {
+  background-color: #f00;
+  margin: 32px;
+}
+
+.confirmationDialog__confirm {
+  background-color: #0f0;
+  margin: 32px;
+}
+
+.record__DidNotFinished{
+  background-color: #fdd !important;
+}
+
+.record__Checkered {
+  background-color: #dfd !important;
+}
+
+.record__MissCourse {
+  background-color: #ffd !important;
+}
+
+.record__Removed {
+  background-color: #ddd !important;
 }

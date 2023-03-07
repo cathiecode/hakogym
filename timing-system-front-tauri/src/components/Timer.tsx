@@ -1,5 +1,5 @@
 import { TimerValue } from "../store"
-import {useInterval } from "usehooks-ts";
+import { useInterval } from "usehooks-ts";
 import { useState } from "react";
 import { formatTimeDuration } from "../utils";
 
