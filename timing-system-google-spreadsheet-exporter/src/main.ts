@@ -6,7 +6,7 @@ import google from "googleapis";
 import { authenticate } from "@google-cloud/local-auth";
 import path from "node:path";
 import { SubscribeStateChangeReply } from "./types/generated/timingsystem/SubscribeStateChangeReply";
-import { StateTree } from "../../timing-system-common/types";
+import { StateTree } from "./types/timing-system";
 import stableHash from "stable-hash";
 
 const packageDefinition = protoLoader.loadSync(
