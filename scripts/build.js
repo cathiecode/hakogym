@@ -12,10 +12,10 @@ const run = (cwd, command, args) => {
 };
 
 
-/*run("timing-system", "cargo", ["build", "--release"]);
-run("timing-system-front-tauri", "npm", ["run", "build"]);*/
+run("timing-system", "cargo", ["build", "--release"]);
+run("timing-system-front-tauri", "npm", ["run", "build"]);
 run("timing-system-google-spreadsheet-exporter", "npm", ["run", "build"]);
-/*run("timing-system-launcher", "npm", ["run", "build"]);*/
+run("timing-system-launcher", "npm", ["run", "build"]);
 
 removeSync("build");
 mkdirSync("build");
@@ -25,7 +25,7 @@ copySync(path.join("timing-system", "target", "release", "timing-system.exe"), p
 copySync(path.join("timing-system-front-tauri", "src-tauri", "target", "release", "timing-system-front.exe"), path.join("build", "data", "timing-system-front-tauri.exe"));
 copySync(path.join("timing-system-google-spreadsheet-exporter", "build"), path.join("build", "data", "timing-system-google-spreadsheet-exporter"));
 copySync(path.join("timing-system-google-spreadsheet-exporter", "package.json"), path.join("build", "data", "timing-system-google-spreadsheet-exporter", "package.json"));
-run(path.join("build", "data", "timing-system-google-spreadsheet-exporter"), "npm", ["install"]);
+run(path.join("build", "data", "timing-system-google-spreadsheet-exporter"), "npm", ["install", "--omit=dev"]);
 copySync(path.join("timing-system-launcher", "src-tauri", "target", "release", "timing-system-launcher.exe"), path.join("build", "timing-system-launcher.exe"));
 copySync(path.join("deps", "node18"), path.join("build", "data", "node18"));
 
