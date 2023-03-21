@@ -96,6 +96,7 @@ export default async function main() {
           result.pylon_touch_count,
           result.derailment_count,
           result.state,
+          result.record_type,
         ]
       );
 

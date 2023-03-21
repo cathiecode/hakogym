@@ -27,6 +27,7 @@ export type RecordData = {
   competition_entry_id: string;
   pylon_touch_count: number;
   derailment_count: number;
+  record_type: string;
 };
 
 export type StateTree = {
