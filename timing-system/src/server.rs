@@ -380,6 +380,35 @@ impl TimingSystem for TimingSystemAppController {
         }))
     }
 
+    async fn set_track_record_type(
+        &self,
+        request: Request<proto::SetTrackRecordTypeRequest>,
+    ) -> Result<Response<proto::CommandReply>, Status> {
+        let params = request.get_ref();
+        let running_cars = self
+            .competition
+            .lock()
+            .await
+            .set_track_record_type(params.timestamp, &params.track_id, &params.record_type)
+            .map_err(|e| Status::failed_precondition(e.to_string()))?;
+        Ok(Response::new(CommandReply {}))
+    }
+
+    async fn change_record_type(
+        &self,
+        request: Request<proto::ChangeRecordTypeRequest>,
+    ) -> Result<Response<proto::CommandReply>, Status> {
+        let params = request.get_ref();
+        let running_cars = self
+            .competition
+            .lock()
+            .await
+            .change_record_type(params.timestamp, &params.record_id, &params.record_type)
+            .map_err(|e| Status::failed_precondition(e.to_string()))?;
+        Ok(Response::new(CommandReply {}))
+    }
+
+
     /*async fn get_results(
         &self,
         _: Request<proto::GetResultsRequest>,

@@ -26,6 +26,9 @@ service TimingSystem {
     rpc ChangeRecordPylonTouchCount (ChangeRecordPylonTouchCountRequest) returns (CommandReply) {}
     rpc ChangeRecordDerailmentCount (ChangeRecordDerailmentCountRequest) returns (CommandReply) {}
 
+    rpc SetTrackRecordType (SetTrackRecordTypeRequest) returns (CommandReply) {}
+    rpc ChangeRecordType (ChangeRecordTypeRequest) returns (CommandReply) {}
+
     rpc GetStateTree (GetStateTreeRequest) returns (GetStateTreeReply) {}
     rpc GetRunningCars (TrackSpecificRequest) returns (GetRunningCarsResponse) {}
     rpc GetRegisteredNextCar (GetRegisteredNextCarRequest) returns (GetRegisteredNextCarReply) {}
@@ -94,6 +97,18 @@ message ChangeRecordDerailmentCountRequest {
     string recordId = 1;
     uint64 timestamp = 2;
     uint32 count = 3;
+}
+
+message ChangeRecordTypeRequest {
+    string recordId = 1;
+    string record_type = 2;
+    uint64 timestamp = 3;
+}
+
+message SetTrackRecordTypeRequest {
+    string trackId = 1;
+    string record_type = 2;
+    uint64 timestamp = 3;
 }
 
 message GetCurrentTracksRequest {

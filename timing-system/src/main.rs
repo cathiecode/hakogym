@@ -13,7 +13,6 @@ use tokio::sync::Mutex;
 use anyhow::Result;
 
 use async_trait::async_trait;
-use chrono::serde::ts_milliseconds_option;
 use chrono::{naive::serde::ts_milliseconds, TimeZone, Utc};
 use serde::{
     ser::{SerializeStruct, SerializeStructVariant},
@@ -21,7 +20,6 @@ use serde::{
 };
 
 use nanoid::nanoid;
-use server::proto::timing_system_server::{TimingSystem, TimingSystemServer};
 use thiserror::Error;
 
 use log::{debug, error, trace};
@@ -384,6 +382,7 @@ struct Track {
     running_cars: VecDeque<RunningCar>,
     pending_car: Option<RunningCar>,
     overwrap_limit: i64,
+    record_type: String
 }
 
 impl Track {
@@ -392,6 +391,7 @@ impl Track {
             running_cars: VecDeque::new(),
             pending_car: None,
             overwrap_limit,
+            record_type: "Free".to_string()
         }
     }
 
@@ -444,6 +444,7 @@ impl Track {
             pylon_touch_count: car.touched_pylon_count,
             derailment_count: car.derailment_count,
             competition_entry_id: car.get_id().clone(),
+            record_type: self.record_type.clone()
         })
     }
 
@@ -476,6 +477,7 @@ impl Track {
             pylon_touch_count: car.touched_pylon_count,
             derailment_count: car.derailment_count,
             competition_entry_id: competition_entry_id.clone(),
+            record_type: self.record_type.clone()
         })
     }
 
@@ -501,6 +503,7 @@ impl Track {
             pylon_touch_count: car.touched_pylon_count,
             derailment_count: car.derailment_count,
             competition_entry_id: competition_entry_id.clone(),
+            record_type: self.record_type.clone()
         })
     }
 
@@ -554,6 +557,11 @@ impl Track {
             Err(AppError::TrackSpecifiedCarNotFound.into())
         }
     }
+
+    fn set_recond_type(&mut self, record_type: &str) -> Result<()> {
+        self.record_type = record_type.to_string();
+        Ok(())
+    }
 }
 
 #[derive(Serialize)]
@@ -575,6 +583,7 @@ struct Record {
     competition_entry_id: CompetitionEntryId,
     pylon_touch_count: u32,
     derailment_count: u32,
+    record_type: String
 }
 
 impl Record {
@@ -680,6 +689,14 @@ enum CompetitionEventKind {
         result_id: ResultId,
         count: u32,
     },
+    ChangeRecordType {
+        result_id: ResultId,
+        record_type: String
+    },
+    SetTrackRecordType {
+        track_id: TrackId,
+        record_type: String
+    }
 }
 
 struct CompetitionEvent {
@@ -810,6 +827,13 @@ impl Competition {
         Ok(())
     }
 
+    fn set_track_record_type(&mut self, track_id: &TrackId, record_type: &str) -> Result<(), anyhow::Error> {
+        self.get_track(track_id)?.set_recond_type(record_type)?;
+
+        Ok(())
+    }
+
+
     fn mark_dnf_to_record(&mut self, record_id: &ResultId) -> Result<(), anyhow::Error> {
         self.get_record(record_id)?.state = RecordState::DidNotFinished;
 
@@ -849,6 +873,15 @@ impl Competition {
         count: &u32,
     ) -> Result<(), anyhow::Error> {
         self.get_record(record_id)?.derailment_count = count.clone();
+        Ok(())
+    }
+
+    fn change_record_type(
+        &mut self,
+        record_id: &ResultId,
+        record_type: &str,
+    ) -> Result<(), anyhow::Error> {
+        self.get_record(record_id)?.record_type = record_type.to_string();
         Ok(())
     }
 
@@ -934,6 +967,12 @@ impl Replayable for Competition {
             CompetitionEventKind::ChangeRecordDerailmentCount { result_id, count } => {
                 self.change_derailment_count_of_record(result_id, count)
             }
+            CompetitionEventKind::ChangeRecordType { result_id, record_type } => {
+                self.change_record_type(result_id, record_type)
+            },
+            CompetitionEventKind::SetTrackRecordType { track_id, record_type } => {
+                self.set_track_record_type(track_id, record_type, )
+            },
         }
     }
 }
@@ -1265,6 +1304,32 @@ impl TimingSystemApp {
 
         Ok(())
     }
+
+    fn change_record_type(&mut self, time_stamp: u64, record_id: &str, record_type: &str) -> Result<(), anyhow::Error> {
+        self.get_competition()?.command(CompetitionEvent::new(
+            time_stamp_from_unixmsec(time_stamp)?,
+            CompetitionEventKind::ChangeRecordType {
+                result_id: record_id.to_string(),
+                record_type: record_type.to_string()
+            },
+        ));
+
+        Ok(())
+    }
+
+    fn set_track_record_type(&mut self, time_stamp: u64, track_id: &str, record_type: &str) -> Result<(), anyhow::Error> {
+        self.get_competition()?.command(CompetitionEvent::new(
+            time_stamp_from_unixmsec(time_stamp)?,
+            CompetitionEventKind::SetTrackRecordType {
+                track_id: track_id.to_string(),
+                record_type: record_type.to_string()
+            },
+        ));
+
+        Ok(())
+    }
+
+
 
     fn change_record_pylon_touch_count(
         &mut self,
