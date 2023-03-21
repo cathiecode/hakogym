@@ -1,17 +1,26 @@
 import { invoke } from "@tauri-apps/api";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router";
 
 type FormData = {
   spreadsheet_id: string;
+  com_port: string;
 };
 
 type LaunchConfig = {
   google_spreadsheet_id: string;
+  com_port: string;
 };
 
 const launch = async (config: LaunchConfig) => {
+  console.log(config);
   console.log(await invoke("launch_request", { config: config }));
+};
+
+const getComPortList = async (): Promise<string[]> => {
+  const comPorts = await invoke("get_com_list");
+  return comPorts as string[];
 };
 
 export default function StartPage() {
@@ -21,6 +30,14 @@ export default function StartPage() {
     formState: { errors },
   } = useForm<FormData>();
 
+  const [comPortList, setComPortList] = useState<string[]>([]);
+
+  useEffect(() => {
+    setInterval(async () => {
+      setComPortList(await getComPortList());
+    }, 5000);
+  });
+
   const navigate = useNavigate();
 
   const onSubmit = handleSubmit((data) => {
@@ -29,6 +46,7 @@ export default function StartPage() {
       console.log("Launch");
       launch({
         google_spreadsheet_id: data.spreadsheet_id,
+        com_port: data.com_port
       });
     }, 1000); // Dirty hack
   });
@@ -37,19 +55,34 @@ export default function StartPage() {
     <div>
       <h1>HAS Timing System</h1>
       <form onSubmit={onSubmit}>
-        <label>
-          出力先Google スプレッドシート:
-          <input
-            {...register("spreadsheet_id", {
-              validate: (input) => {
-                if (input.match("/")) {
-                  return "URLが指定されました。スプレッドシートIDを指定してください。（例: 4y-4xEItrNEnoat98abTNU4ay7pjcNJqc）";
-                }
-              },
-            })}
-          />
-        </label>
+        <div>
+          <label>
+            出力先Google スプレッドシート:
+            <input
+              {...register("spreadsheet_id", {
+                validate: (input) => {
+                  if (input.match("/")) {
+                    return "URLが指定されました。スプレッドシートIDを指定してください。（例: 4y-4xEItrNEnoat98abTNU4ay7pjcNJqc）";
+                  }
+                },
+              })}
+            />
+          </label>
+        </div>
         <div>{errors.spreadsheet_id?.message ?? ""}</div>
+        <div>
+          <label>
+            計測器シリアルポート:
+            <select
+              {...register("com_port", {
+                required: "COMポートを指定してください",
+              })}
+            >
+              {comPortList.map(com => <option value={com}>{com}</option>)}
+            </select>
+          </label>
+        </div>
+        <div>{errors.com_port?.message ?? ""}</div>
         <button>開始</button>
       </form>
     </div>

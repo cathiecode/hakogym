@@ -89,6 +89,7 @@ impl Encoder<String> for LineCodec {
 #[tokio::main]
 async fn main() {
     let com_port = std::env::args().collect::<Vec<String>>()[1].clone();
+    println!("Trying to open {}", com_port);
     let serial = tokio_serial::new(com_port, 9600)
         .open_native_async()
         .expect("Failed to open serial io");

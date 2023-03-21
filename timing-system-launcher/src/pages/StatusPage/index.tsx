@@ -14,6 +14,11 @@ const StatusIcon = {
 
 export default function StatusPage() {
   const [services, setServices] = useState(new Map<string, "Spawned" | "Exited">());
+  const [log, setLog] = useState<string[]>([]);
+
+  const addLog = (logString: string) => {
+    setLog(current => [...current.slice(-9), logString]);
+  }
 
   useEffect(() => {
     const unlisten = listen("service_event", (event) => {

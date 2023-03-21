@@ -41,7 +41,7 @@ async fn main() {
             });
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler!(launch_request))
+        .invoke_handler(tauri::generate_handler!(launch_request, get_com_list))
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 
@@ -53,6 +53,7 @@ async fn main() {
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 struct LaunchConfiguration {
     google_spreadsheet_id: String,
+    com_port: String
 }
 
 type Service = String;
@@ -101,6 +102,18 @@ fn start_service(
 }
 
 #[tauri::command]
+fn get_com_list() -> Result<Vec<String>, ()> {
+    tokio_serial::available_ports()
+        .map(|ports| {
+            ports
+                .iter()
+                .map(|item| item.port_name.to_string())
+                .collect::<Vec<String>>()
+        })
+        .map_err(|_| ())
+}
+
+#[tauri::command]
 fn launch_request(state: tauri::State<AppGlobal>, config: LaunchConfiguration) {
     launch(config, state.service_message_sender.clone());
 }
@@ -112,6 +125,20 @@ fn launch(config: LaunchConfiguration, message_channel: mpsc::SyncSender<Service
         "Main",
         {
             let command = Command::new(Path::new(".").join("data").join("timing-system.exe"));
+            command
+        },
+        &message_channel,
+    );
+
+    start_service(
+        "Signal IO",
+        {
+            let mut command = Command::new(
+                Path::new(".")
+                    .join("data")
+                    .join("timing-system-signal-io.exe"),
+            );
+            command.arg(config.com_port);
             command
         },
         &message_channel,
@@ -135,13 +162,28 @@ fn launch(config: LaunchConfiguration, message_channel: mpsc::SyncSender<Service
         {
             let mut command =
                 Command::new(Path::new(".").join("data").join("node18").join("node.exe"));
-            command.args([Path::new(".")
-                .join("data")
-                .join("timing-system-google-spreadsheet-exporter")
-                .join("main.js")])
+            command
+                .args([Path::new(".")
+                    .join("data")
+                    .join("timing-system-google-spreadsheet-exporter")
+                    .join("main.js")])
                 .arg(config.google_spreadsheet_id);
             command
         },
         &message_channel,
-    )
+    );
+
+    start_service(
+        "VLC Controller",
+        {
+            let mut command =
+                Command::new(Path::new(".").join("data").join("node18").join("node.exe"));
+            command.args([Path::new(".")
+                .join("data")
+                .join("timing-system-vlc-controller")
+                .join("main.js")]);
+            command
+        },
+        &message_channel,
+    );
 }
