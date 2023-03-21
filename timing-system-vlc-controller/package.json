@@ -1,0 +1,25 @@
+{
+  "name": "timing-system-vlc-controller",
+  "version": "0.1.0",
+  "description": "",
+  "main": "main.js",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.js",
+    "dev": "npm run build && cd build && node main.js"
+  },
+  "author": "cathiecode",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/fs-extra": "^11.0.1",
+    "@types/node": "^18.14.0",
+    "esbuild": "^0.17.10",
+    "fs-extra": "^11.1.0",
+    "typescript": "^4.9.5"
+  },
+  "dependencies": {
+    "@grpc/grpc-js": "^1.8.9",
+    "@grpc/proto-loader": "^0.7.5",
+    "vlc-client": "^1.1.1"
+  }
+}
