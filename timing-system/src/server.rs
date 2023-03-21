@@ -44,7 +44,7 @@ impl TimingSystemAppController {
                             let mut map = HashMap::new();
                             map.insert(
                                 "0".to_owned(),
-                                CompetitionConfigurationTrack { overlap_limit: 2 },
+                                CompetitionConfigurationTrack { overlap_limit: 1 },
                             );
                             map
                         },
