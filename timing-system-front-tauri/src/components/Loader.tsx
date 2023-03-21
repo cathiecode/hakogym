@@ -16,5 +16,5 @@ export default function Loader<T>(props: LoaderProps<T>) {
     );
   }
 
-  return <div>N/A</div>;
+  return <div>競技記録が初期化されていません。初期化してください。</div>;
 }
