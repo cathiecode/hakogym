@@ -109,6 +109,36 @@ async fn red_flag(timestamp: u64, track_id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+async fn set_track_record_type(timestamp: u64, track_id: String, record_type: String) -> Result<(), String> {
+    let mut connection = get_connection().await?;
+    let request = proto::SetTrackRecordTypeRequest {
+        timestamp,
+        track_id,
+        record_type,
+    };
+    connection
+        .set_track_record_type(request)
+        .await
+        .map_err(|error| error.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn change_record_type(timestamp: u64, record_id: String, record_type: String) -> Result<(), String> {
+    let mut connection = get_connection().await?;
+    let request = proto::ChangeRecordTypeRequest {
+        timestamp,
+        record_id,
+        record_type,
+    };
+    connection
+        .change_record_type(request)
+        .await
+        .map_err(|error| error.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
 async fn mark_pylon_touch(timestamp: u64, track_id: String, car_id: String) -> Result<(), String> {
     let mut connection = get_connection().await?;
     let request = proto::RunnningCarSpecificRequest {
@@ -365,7 +395,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             remove_record,
             recovery_record,
             change_record_pylon_touch_count,
-            change_record_derailment_count
+            change_record_derailment_count,
+            set_track_record_type,
+            change_record_type
         ))
         .run(tauri::generate_context!())?;
     Ok(())

@@ -71,6 +71,8 @@ const recoveryRecord = recordSpecificCommand("recovery_record");
 
 const changeRecordPylonTouchCount = typedCommand<{timestamp: number, recordId: string, count: number}, void>("change_record_pylon_touch_count");
 const changeRecordDerailmentCount = typedCommand<{timestamp: number, recordId: string, count: number}, void>("change_record_derailment_count");
+const changeRecordType = typedCommand<{timestamp: number, recordId: string, recordType: string}, void>("change_record_type");
+const setTrackRecordType = typedCommand<{timestamp: number, trackId: string, recordType: string}, void>("set_track_record_type");
 
 export {
   markPylonTouch,
@@ -85,4 +87,6 @@ export {
   recoveryRecord,
   changeRecordPylonTouchCount,
   changeRecordDerailmentCount,
+  changeRecordType,
+  setTrackRecordType
 }

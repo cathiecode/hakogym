@@ -67,7 +67,8 @@ export type RecordData = {
   duration: number;
   competition_entry_id: string;
   pylon_touch_count: number,
-  derailment_count: number
+  derailment_count: number,
+  record_type: string
 }
 
 export type StateTree = {
@@ -76,6 +77,7 @@ export type StateTree = {
       running_cars: RunningCar[];
       pending_car: RunningCar | null;
       overwrap_limit: 2;
+      record_type: string
     };
   };
   records: {

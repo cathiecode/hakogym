@@ -16,6 +16,7 @@ import {
   removeDerailment,
   removePylonTouch,
   removeRecord,
+  setTrackRecordType,
   start,
   stop,
 } from "./command";
@@ -90,11 +91,20 @@ function App() {
               {Object.entries(data.tracks).map(([trackId, track]) => (
                 <div>
                   <h2>トラック {trackId}</h2>
+                  <div>
+                    <details>
+                      <summary>記録モード: {track.record_type}</summary>
+                      <button onClick={() => setTrackRecordType({timestamp: Date.now(), recordType: "Free", trackId: trackId})}>Free</button>
+                      <button onClick={() => setTrackRecordType({timestamp: Date.now(), recordType: "LAP1", trackId: trackId})}>LAP1</button>
+                      <button onClick={() => setTrackRecordType({timestamp: Date.now(), recordType: "LAP2", trackId: trackId})}>LAP2</button>
+                    </details>
+                  </div>
                   <div>同時出走制限: {track.overwrap_limit}台</div>
                   <table className={styles.table}>
                     <thead>
                       <tr>
                         <th>状態</th>
+                        <th>LAP</th>
                         <th>ゼッケン</th>
                         <th>タイム(ペナルティなし)</th>
                         <th>ペナルティ</th>
@@ -110,6 +120,9 @@ function App() {
                           <tr className={styles[`record__${result.state}`]}>
                             <td>
                               {RECORD_STATE_MAP[result.state] ?? result.state}
+                            </td>
+                            <td>
+                              {result.record_type}
                             </td>
                             <th>{result.competition_entry_id}</th>
                             <td>{formatTimeDuration(result.duration)}</td>
@@ -210,6 +223,7 @@ function App() {
                       {track.running_cars.map((running_car) => (
                         <tr className={styles["row--running"]}>
                           <td>走行中</td>
+                          <td>{track.record_type}</td>
                           <th>{running_car.id}</th>
                           <td>
                             <Timer timer={running_car.timer} />
@@ -311,6 +325,7 @@ function App() {
                       {track.pending_car?.id ? (
                         <tr className={styles["row--pending"]}>
                           <td>出走待機中</td>
+                          <td>{track.record_type}</td>
                           <th>{track.pending_car?.id}</th>
                           <td>--</td>
                           <td>--</td>
