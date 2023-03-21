@@ -1,7 +1,7 @@
+use log::trace;
 use std::collections::HashMap;
 use std::pin::Pin;
 use std::sync::Arc;
-use log::trace;
 use tokio::sync::{mpsc, Mutex};
 
 use anyhow::Result;
@@ -11,12 +11,13 @@ use tonic::{transport::Server, Request, Response, Status};
 
 use crate::server::proto::timing_system_server::{TimingSystem, TimingSystemServer};
 use crate::{
-    CompetitionEntryId, CompetitionConfigurationId, CompetitionConfigurationTrack,
-    MockCompetitionConfigurationRepository, TimingSystemApp, MockCompetitionResultRepository,
+    CompetitionConfigurationId, CompetitionConfigurationTrack, CompetitionEntryId,
+    MockCompetitionConfigurationRepository, MockCompetitionResultRepository, TimingSystemApp,
 };
 
 use self::proto::{
-    CommandReply, GetCurrentTracksReply, GetRegisteredNextCarReply, SubscribeStateChangeReply,
+    CommandReply, GetCurrentTracksReply, GetRegisteredNextCarReply, GetRunningCarsResponse,
+    SubscribeStateChangeReply,
 };
 
 pub mod proto {
@@ -37,8 +38,8 @@ impl TimingSystemAppController {
         Self {
             competition: Arc::new(Mutex::new(TimingSystemApp {
                 competition: None,
-                competition_configuration_repository: Arc::new(Mutex::new(MockCompetitionConfigurationRepository(
-                    crate::CompetitionConfiguration {
+                competition_configuration_repository: Arc::new(Mutex::new(
+                    MockCompetitionConfigurationRepository(crate::CompetitionConfiguration {
                         tracks: {
                             let mut map = HashMap::new();
                             map.insert(
@@ -47,8 +48,8 @@ impl TimingSystemAppController {
                             );
                             map
                         },
-                    },
-                ))),
+                    }),
+                )),
             })),
             change_watcher_sender,
             change_watcher_receiver,
@@ -156,7 +157,11 @@ impl TimingSystem for TimingSystemAppController {
         self.competition
             .lock()
             .await
-            .did_not_finished(params.timestamp, params.track_id.as_str(), params.car_id.as_str())
+            .did_not_finished(
+                params.timestamp,
+                params.track_id.as_str(),
+                params.car_id.as_str(),
+            )
             .map_err(|e| Status::failed_precondition(e.to_string()))?;
         self.notify_change().await?;
         Ok(Response::new(CommandReply {}))
@@ -170,12 +175,15 @@ impl TimingSystem for TimingSystemAppController {
         self.competition
             .lock()
             .await
-            .miss_course(params.timestamp, params.track_id.as_str(), params.car_id.as_str())
+            .miss_course(
+                params.timestamp,
+                params.track_id.as_str(),
+                params.car_id.as_str(),
+            )
             .map_err(|e| Status::failed_precondition(e.to_string()))?;
         self.notify_change().await?;
         Ok(Response::new(CommandReply {}))
     }
-
 
     async fn mark_pylon_touch(
         &self,
@@ -185,7 +193,11 @@ impl TimingSystem for TimingSystemAppController {
         self.competition
             .lock()
             .await
-            .mark_pylon_touch(params.timestamp, params.track_id.as_str(), params.car_id.as_str())
+            .mark_pylon_touch(
+                params.timestamp,
+                params.track_id.as_str(),
+                params.car_id.as_str(),
+            )
             .map_err(|e| Status::failed_precondition(e.to_string()))?;
         self.notify_change().await?;
         Ok(Response::new(CommandReply {}))
@@ -199,7 +211,11 @@ impl TimingSystem for TimingSystemAppController {
         self.competition
             .lock()
             .await
-            .remove_pylon_touch(params.timestamp, params.track_id.as_str(), params.car_id.as_str())
+            .remove_pylon_touch(
+                params.timestamp,
+                params.track_id.as_str(),
+                params.car_id.as_str(),
+            )
             .map_err(|e| Status::failed_precondition(e.to_string()))?;
         self.notify_change().await?;
         Ok(Response::new(CommandReply {}))
@@ -213,7 +229,11 @@ impl TimingSystem for TimingSystemAppController {
         self.competition
             .lock()
             .await
-            .add_derailment_count(params.timestamp, params.track_id.as_str(), params.car_id.as_str())
+            .add_derailment_count(
+                params.timestamp,
+                params.track_id.as_str(),
+                params.car_id.as_str(),
+            )
             .map_err(|e| Status::failed_precondition(e.to_string()))?;
         self.notify_change().await?;
         Ok(Response::new(CommandReply {}))
@@ -227,13 +247,20 @@ impl TimingSystem for TimingSystemAppController {
         self.competition
             .lock()
             .await
-            .remove_derailment_count(params.timestamp, params.track_id.as_str(), params.car_id.as_str())
+            .remove_derailment_count(
+                params.timestamp,
+                params.track_id.as_str(),
+                params.car_id.as_str(),
+            )
             .map_err(|e| Status::failed_precondition(e.to_string()))?;
         self.notify_change().await?;
         Ok(Response::new(CommandReply {}))
     }
 
-    async fn mark_dnf_to_record(&self, request: Request<proto::RecordSpecificRequest>) -> Result<Response<proto::CommandReply>, Status> {
+    async fn mark_dnf_to_record(
+        &self,
+        request: Request<proto::RecordSpecificRequest>,
+    ) -> Result<Response<proto::CommandReply>, Status> {
         let params = request.get_ref();
         self.competition
             .lock()
@@ -244,7 +271,10 @@ impl TimingSystem for TimingSystemAppController {
         Ok(Response::new(CommandReply {}))
     }
 
-    async fn mark_miss_course_to_record(&self, request: Request<proto::RecordSpecificRequest>) -> Result<Response<proto::CommandReply>, Status> {
+    async fn mark_miss_course_to_record(
+        &self,
+        request: Request<proto::RecordSpecificRequest>,
+    ) -> Result<Response<proto::CommandReply>, Status> {
         let params = request.get_ref();
         self.competition
             .lock()
@@ -255,7 +285,10 @@ impl TimingSystem for TimingSystemAppController {
         Ok(Response::new(CommandReply {}))
     }
 
-    async fn remove_record(&self, request: Request<proto::RecordSpecificRequest>) -> Result<Response<proto::CommandReply>, Status> {
+    async fn remove_record(
+        &self,
+        request: Request<proto::RecordSpecificRequest>,
+    ) -> Result<Response<proto::CommandReply>, Status> {
         let params = request.get_ref();
         self.competition
             .lock()
@@ -266,7 +299,10 @@ impl TimingSystem for TimingSystemAppController {
         Ok(Response::new(CommandReply {}))
     }
 
-    async fn recovery_record(&self, request: Request<proto::RecordSpecificRequest>) -> Result<Response<proto::CommandReply>, Status> {
+    async fn recovery_record(
+        &self,
+        request: Request<proto::RecordSpecificRequest>,
+    ) -> Result<Response<proto::CommandReply>, Status> {
         let params = request.get_ref();
         self.competition
             .lock()
@@ -277,23 +313,37 @@ impl TimingSystem for TimingSystemAppController {
         Ok(Response::new(CommandReply {}))
     }
 
-    async fn change_record_pylon_touch_count(&self, request: Request<proto::ChangeRecordPylonTouchCountRequest>) -> Result<Response<proto::CommandReply>, Status> {
+    async fn change_record_pylon_touch_count(
+        &self,
+        request: Request<proto::ChangeRecordPylonTouchCountRequest>,
+    ) -> Result<Response<proto::CommandReply>, Status> {
         let params = request.get_ref();
         self.competition
             .lock()
             .await
-            .change_record_pylon_touch_count(params.timestamp, params.record_id.as_str(), params.count)
+            .change_record_pylon_touch_count(
+                params.timestamp,
+                params.record_id.as_str(),
+                params.count,
+            )
             .map_err(|e| Status::failed_precondition(e.to_string()))?;
         self.notify_change().await?;
         Ok(Response::new(CommandReply {}))
     }
 
-    async fn change_record_derailment_count(&self, request: Request<proto::ChangeRecordDerailmentCountRequest>) -> Result<Response<proto::CommandReply>, Status> {
+    async fn change_record_derailment_count(
+        &self,
+        request: Request<proto::ChangeRecordDerailmentCountRequest>,
+    ) -> Result<Response<proto::CommandReply>, Status> {
         let params = request.get_ref();
         self.competition
             .lock()
             .await
-            .change_derailment_count_of_record(params.timestamp, params.record_id.as_str(), params.count)
+            .change_derailment_count_of_record(
+                params.timestamp,
+                params.record_id.as_str(),
+                params.count,
+            )
             .map_err(|e| Status::failed_precondition(e.to_string()))?;
         self.notify_change().await?;
         Ok(Response::new(CommandReply {}))
@@ -311,6 +361,22 @@ impl TimingSystem for TimingSystemAppController {
             .map_err(|e| Status::failed_precondition(e.to_string()))?;
         Ok(Response::new(GetRegisteredNextCarReply {
             car_id: registered_next_car,
+        }))
+    }
+
+    async fn get_running_cars(
+        &self,
+        request: Request<proto::TrackSpecificRequest>,
+    ) -> Result<Response<proto::GetRunningCarsResponse>, Status> {
+        let params = request.get_ref();
+        let running_cars = self
+            .competition
+            .lock()
+            .await
+            .get_running_cars(&params.track_id)
+            .map_err(|e| Status::failed_precondition(e.to_string()))?;
+        Ok(Response::new(GetRunningCarsResponse {
+            car_id: running_cars,
         }))
     }
 

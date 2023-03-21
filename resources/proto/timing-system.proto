@@ -27,6 +27,7 @@ service TimingSystem {
     rpc ChangeRecordDerailmentCount (ChangeRecordDerailmentCountRequest) returns (CommandReply) {}
 
     rpc GetStateTree (GetStateTreeRequest) returns (GetStateTreeReply) {}
+    rpc GetRunningCars (TrackSpecificRequest) returns (GetRunningCarsResponse) {}
     rpc GetRegisteredNextCar (GetRegisteredNextCarRequest) returns (GetRegisteredNextCarReply) {}
     rpc SubscribeStateChange (SubscribeStateChangeRequest) returns(stream SubscribeStateChangeReply) {}
 }
@@ -113,6 +114,14 @@ message GetStateTreeReply {
 
 message GetRegisteredNextCarRequest {
     string trackId = 1;
+}
+
+message TrackSpecificRequest {
+    string trackId = 1;
+}
+
+message GetRunningCarsResponse {
+    repeated string carId = 1;
 }
 
 message GetRegisteredNextCarReply {
