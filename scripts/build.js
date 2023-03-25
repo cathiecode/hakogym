@@ -11,7 +11,6 @@ const run = (cwd, command, args) => {
   console.log(spawnSync(command, args, { cwd, stdio: "inherit", shell: true }));
 };
 
-/*
 run("timing-system", "cargo", ["build", "--release"]);
 run("timing-system-signal-io", "cargo", ["build", "--release"]);
 run("timing-system-front-tauri", "npm", ["run", "build"]);
@@ -19,7 +18,6 @@ run("timing-system-time-display", "npm", ["run", "build"]);
 run("timing-system-vlc-controller", "npm", ["run", "build"]);
 run("timing-system-google-spreadsheet-exporter", "npm", ["run", "build"]);
 run("timing-system-launcher", "npm", ["run", "build"]);
-*/
 
 removeSync("build");
 mkdirSync("build");

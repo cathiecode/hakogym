@@ -53,7 +53,8 @@ async fn main() {
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 struct LaunchConfiguration {
     google_spreadsheet_id: String,
-    com_port: String
+    com_port: String,
+    google_spreadsheet_start_row: String
 }
 
 type Service = String;
@@ -181,7 +182,8 @@ fn launch(config: LaunchConfiguration, message_channel: mpsc::SyncSender<Service
                     .join("data")
                     .join("timing-system-google-spreadsheet-exporter")
                     .join("main.js")])
-                .arg(config.google_spreadsheet_id);
+                .arg(config.google_spreadsheet_id)
+                .arg(config.google_spreadsheet_start_row);
             command
         },
         &message_channel,

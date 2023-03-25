@@ -5,11 +5,13 @@ import { useNavigate } from "react-router";
 
 type FormData = {
   spreadsheet_id: string;
+  spreadsheet_start_row: string;
   com_port: string;
 };
 
 type LaunchConfig = {
   google_spreadsheet_id: string;
+  google_spreadsheet_start_row: string;
   com_port: string;
 };
 
@@ -28,7 +30,11 @@ export default function StartPage() {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<FormData>();
+  } = useForm<FormData>({
+    defaultValues: {
+      spreadsheet_start_row: "A1"
+    }
+  });
 
   const [comPortList, setComPortList] = useState<string[]>([]);
 
@@ -46,6 +52,7 @@ export default function StartPage() {
       console.log("Launch");
       launch({
         google_spreadsheet_id: data.spreadsheet_id,
+        google_spreadsheet_start_row: data.spreadsheet_start_row,
         com_port: data.com_port
       });
     }, 1000); // Dirty hack
@@ -69,6 +76,23 @@ export default function StartPage() {
             />
           </label>
         </div>
+        <details>
+        <div>
+          <summary>Google スプレッドシート詳細設定</summary>
+          <label>
+            開始行:
+            <input
+              {...register("spreadsheet_start_row", {
+                validate: (input) => {
+                  if (!input.match(/[A-Z]+[0-9]+/)) {
+                    return "開始行は[A-Z]+[0-9]+の形式を取る必要があります。（例: A1、A31）";
+                  }
+                },
+              })}
+            />
+          </label>
+        </div>
+        </details>
         <div>{errors.spreadsheet_id?.message ?? ""}</div>
         <div>
           <label>

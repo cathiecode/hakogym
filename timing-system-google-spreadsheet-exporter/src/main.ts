@@ -41,6 +41,7 @@ const TARGET_SHEET_TITLE = "HAS_TIMING_SYSTEM_DATA";
 
 export default async function main() {
   const spreadsheetId = process.argv[2];
+  const spreadsheetStartRow = process.argv[3] ?? "A1";
 
   const auth = await getGoogleApiAuthorization();
 
@@ -102,10 +103,10 @@ export default async function main() {
 
       await gsheets.spreadsheets.values.update({
         spreadsheetId: spreadsheetId,
-        range: "A1",
+        range: spreadsheetStartRow,
         valueInputOption: "RAW",
         requestBody: {
-          range: "A1",
+          range: spreadsheetStartRow,
           majorDimension: "ROWS",
           values: values,
         },
