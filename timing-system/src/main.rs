@@ -7,6 +7,7 @@ use std::{
     time,
 };
 
+use env_logger::fmt::Timestamp;
 use serde_with::serde_as;
 use tokio::sync::Mutex;
 
@@ -444,7 +445,8 @@ impl Track {
             pylon_touch_count: car.touched_pylon_count,
             derailment_count: car.derailment_count,
             competition_entry_id: car.get_id().clone(),
-            record_type: self.record_type.clone()
+            record_type: self.record_type.clone(),
+            timestamp: date
         })
     }
 
@@ -477,7 +479,8 @@ impl Track {
             pylon_touch_count: car.touched_pylon_count,
             derailment_count: car.derailment_count,
             competition_entry_id: competition_entry_id.clone(),
-            record_type: self.record_type.clone()
+            record_type: self.record_type.clone(),
+            timestamp: date
         })
     }
 
@@ -503,7 +506,8 @@ impl Track {
             pylon_touch_count: car.touched_pylon_count,
             derailment_count: car.derailment_count,
             competition_entry_id: competition_entry_id.clone(),
-            record_type: self.record_type.clone()
+            record_type: self.record_type.clone(),
+            timestamp: date
         })
     }
 
@@ -583,7 +587,9 @@ struct Record {
     competition_entry_id: CompetitionEntryId,
     pylon_touch_count: u32,
     derailment_count: u32,
-    record_type: String
+    record_type: String,
+    #[serde_as(as = "serde_with::TimestampSeconds<i64>")] // FIXME
+    timestamp: TimeStamp
 }
 
 impl Record {

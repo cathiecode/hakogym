@@ -158,6 +158,20 @@ fn launch(config: LaunchConfiguration, message_channel: mpsc::SyncSender<Service
     );
 
     start_service(
+        "TimeDisplay",
+        {
+            let command = Command::new(
+                Path::new(".")
+                    .join("data")
+                    .join("timing-system-time-display.exe"),
+            );
+            command
+        },
+        &message_channel,
+    );
+
+
+    start_service(
         "Google Spreadsheet Exporter",
         {
             let mut command =
