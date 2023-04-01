@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package has.runningobserver;
+
+// import "google/protobuf/wrappers.proto";
+
+service RunningObserver {
+  rpc Start(StartCommandRequest) returns(CommandReply) {}
+  rpc Stop(StopCommandRequest) returns (CommandReply) {}
+}
+
+message StartCommandRequest {
+  
+}
+
+message StopCommandRequest {
+
+}
+
+message CommandReply {
+  
+}

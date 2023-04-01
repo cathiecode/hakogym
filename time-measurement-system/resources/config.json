@@ -1,0 +1,10 @@
+{
+  "record": {
+    "metadata": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "Default Metadata"
+    }
+  }
+}

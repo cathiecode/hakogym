@@ -1,15 +1,17 @@
 use std::{sync::Arc};
+use jsonschema::JSONSchema;
 use log::{debug, trace};
 use tokio::sync::Mutex;
 
 use anyhow::{anyhow, Result, bail};
 use async_trait::async_trait;
 
-use crate::prelude::*;
+use crate::{prelude::*, Config};
 
 struct RunningCar {
     car_id: Option<CarId>,
     start_at: TimeStamp,
+    meta: String
 }
 
 #[async_trait]
@@ -30,13 +32,16 @@ pub trait RecordService {
 }
 
 pub struct RunningObserver {
+    running_car: Vec<RunningCar>,
+    meta_schema: JSONSchema,
+    default_meta_data: String,
     next_car_queue: Arc<Mutex<dyn NextCarQueue>>,
     record_service: Arc<Mutex<dyn RecordService>>,
-    running_car: Vec<RunningCar>,
 }
 
 impl RunningObserver {
     pub fn new(
+        config: &Config,
         next_car_queue: Arc<Mutex<dyn NextCarQueue>>,
         record_service: Arc<Mutex<dyn RecordService>>,
     ) -> RunningObserver {
@@ -44,6 +49,8 @@ impl RunningObserver {
             next_car_queue,
             running_car: Vec::new(),
             record_service,
+            meta_schema: JSONSchema::compile(&config.record.metadata.schema).unwrap_or_else(|e| panic!("Invalid metadata schema!")),
+            default_meta_data: config.record.metadata.default.to_string()
         }
     }
 
@@ -54,6 +61,7 @@ impl RunningObserver {
         self.running_car.push(RunningCar {
             car_id: next_car_id,
             start_at: timestamp,
+            meta: self.default_meta_data.clone(),
         });
 
         Ok(())
@@ -81,9 +89,9 @@ impl RunningObserver {
             .lock()
             .await
             .record(Record {
+                duration,
                 car_id: stopped_car.car_id,
-                duration: duration,
-                meta: "".to_string() // TODO
+                meta: self.default_meta_data.clone()
             })
             .await;
 
@@ -173,7 +181,7 @@ mod tests {
 
         let a = next_car_queue.clone();
         let b = record_service.clone();
-        (RunningObserver::new(next_car_queue, record_service), a, b)
+        (RunningObserver::new(&Config::default(), next_car_queue, record_service), a, b)
     }
 
     fn setup_empty_queue() -> (
@@ -188,7 +196,7 @@ mod tests {
 
         let a = next_car_queue.clone();
         let b = record_service.clone();
-        (RunningObserver::new(next_car_queue, record_service), a, b)
+        (RunningObserver::new(&Config::default(), next_car_queue, record_service), a, b)
     }
 
     #[tokio::test]
