@@ -1,4 +1,5 @@
-use std::sync::Arc;
+use std::{sync::Arc};
+use log::{debug, trace};
 use tokio::sync::Mutex;
 
 use anyhow::{anyhow, Result, bail};
@@ -16,10 +17,11 @@ pub trait NextCarQueue {
     async fn consume_next_car(&mut self) -> Option<CarId>;
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Record {
     pub car_id: Option<CarId>,
     pub duration: Duration,
+    pub meta: String
 }
 
 #[async_trait]
@@ -46,6 +48,7 @@ impl RunningObserver {
     }
 
     pub async fn start(&mut self, timestamp: TimeStamp) -> Result<()> {
+        debug!("Running start at {:?}", timestamp);
         let next_car_id = self.next_car_queue.lock().await.consume_next_car().await;
 
         self.running_car.push(RunningCar {
@@ -57,6 +60,8 @@ impl RunningObserver {
     }
 
     pub async fn stop(&mut self, timestamp: TimeStamp, car_id: Option<CarId>) -> Result<()> {
+        trace!("Stop requested at {:?} and car_id was {:?}", timestamp, car_id);
+
         if self.running_car.len() == 0 {
             bail!("No one running");
         }
@@ -65,6 +70,8 @@ impl RunningObserver {
             Some(car_id) => self.find_car_index(&car_id)?,
             None => 0,
         };
+
+        debug!("Running stopped at {:?} and index {:?} was now stopped", timestamp, car_to_stop);
 
         let stopped_car = self.running_car.remove(car_to_stop);
 
@@ -76,18 +83,24 @@ impl RunningObserver {
             .record(Record {
                 car_id: stopped_car.car_id,
                 duration: duration,
+                meta: "".to_string() // TODO
             })
             .await;
+
+        trace!("Done stop process.");
 
         Ok(())
     }
 
     pub async fn flip_start_or_stop(&mut self, timestamp: TimeStamp) -> Result<()> {
+        trace!("Flipping start and stop");
         if self.running_car.len() == 0 {
-            self.start(timestamp).await;
+            debug!("Nobody running so starting.");
+            self.start(timestamp).await?;
             Ok(())
         } else {
-            self.stop(timestamp, None).await;
+            debug!("Someone running so stopping.");
+            self.stop(timestamp, None).await?;
             Ok(())
         }
     }
