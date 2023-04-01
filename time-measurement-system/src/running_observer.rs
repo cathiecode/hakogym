@@ -1,29 +1,28 @@
-use std::{sync::Arc};
+use anyhow::{anyhow, bail, Result};
+use async_trait::async_trait;
 use jsonschema::JSONSchema;
 use log::{debug, trace};
+use nanoid::nanoid;
+use std::sync::Arc;
 use tokio::sync::Mutex;
-
-use anyhow::{anyhow, Result, bail};
-use async_trait::async_trait;
 
 use crate::{prelude::*, Config};
 
 struct RunningCar {
-    car_id: Option<CarId>,
+    car_id: RunningCarId,
     start_at: TimeStamp,
-    meta: String
+    meta: String,
 }
 
 #[async_trait]
 pub trait NextCarQueue {
-    async fn consume_next_car(&mut self) -> Option<CarId>;
+    async fn consume_next_car(&mut self) -> Option<MetaData>;
 }
 
 #[derive(Clone, Debug)]
 pub struct Record {
-    pub car_id: Option<CarId>,
     pub duration: Duration,
-    pub meta: String
+    pub meta: String,
 }
 
 #[async_trait]
@@ -45,43 +44,58 @@ impl RunningObserver {
         next_car_queue: Arc<Mutex<dyn NextCarQueue>>,
         record_service: Arc<Mutex<dyn RecordService>>,
     ) -> RunningObserver {
+        println!("schema: {:?}", config.record.metadata.schema);
+
         RunningObserver {
             next_car_queue,
             running_car: Vec::new(),
             record_service,
-            meta_schema: JSONSchema::compile(&config.record.metadata.schema).unwrap_or_else(|e| panic!("Invalid metadata schema!")),
-            default_meta_data: config.record.metadata.default.to_string()
+            meta_schema: JSONSchema::compile(&config.record.metadata.schema)
+                .unwrap_or_else(|e| panic!("Invalid metadata schema! ({:?})", e)),
+            default_meta_data: config.record.metadata.default.to_string(),
         }
     }
 
     pub async fn start(&mut self, timestamp: TimeStamp) -> Result<()> {
         debug!("Running start at {:?}", timestamp);
-        let next_car_id = self.next_car_queue.lock().await.consume_next_car().await;
+        let next_car_metadata = self.next_car_queue.lock().await.consume_next_car().await;
 
         self.running_car.push(RunningCar {
-            car_id: next_car_id,
+            car_id: nanoid!(),
             start_at: timestamp,
-            meta: self.default_meta_data.clone(),
+            meta: next_car_metadata.unwrap_or_else(|| {self.default_meta_data.clone()}),
         });
 
         Ok(())
     }
 
-    pub async fn stop(&mut self, timestamp: TimeStamp, car_id: Option<CarId>) -> Result<()> {
-        trace!("Stop requested at {:?} and car_id was {:?}", timestamp, car_id);
+    pub async fn stop(
+        &mut self,
+        timestamp: TimeStamp,
+        car_id: &Option<RunningCarId>,
+    ) -> Result<()> {
+        trace!(
+            "Stop requested at {:?} and car_id was {:?}",
+            timestamp,
+            car_id
+        );
 
         if self.running_car.len() == 0 {
             bail!("No one running");
         }
 
         let car_to_stop = match car_id {
-            Some(car_id) => self.find_car_index(&car_id)?,
+            Some(car_id) => self.find_car_index(car_id)?,
             None => 0,
         };
 
-        debug!("Running stopped at {:?} and index {:?} was now stopped", timestamp, car_to_stop);
-
         let stopped_car = self.running_car.remove(car_to_stop);
+
+        debug!(
+            "Running stopped at {:?} and index {:?} was now stopped. meta: {:?}",
+            timestamp, car_to_stop, stopped_car.meta
+        );
+
 
         let duration: Duration = timestamp - stopped_car.start_at;
 
@@ -90,8 +104,7 @@ impl RunningObserver {
             .await
             .record(Record {
                 duration,
-                car_id: stopped_car.car_id,
-                meta: self.default_meta_data.clone()
+                meta: stopped_car.meta,
             })
             .await;
 
@@ -108,17 +121,17 @@ impl RunningObserver {
             Ok(())
         } else {
             debug!("Someone running so stopping.");
-            self.stop(timestamp, None).await?;
+            self.stop(timestamp, &None).await?;
             Ok(())
         }
     }
 
-    fn find_car_index(&mut self, car_id: &CarId) -> Result<usize> {
-        if let Some(index) = self.running_car.iter().position(|car| {
-            car.car_id
-                .as_ref()
-                .map_or(false, |unwrapped_car_id| unwrapped_car_id == car_id)
-        }) {
+    fn find_car_index(&mut self, car_id: &RunningCarId) -> Result<usize> {
+        if let Some(index) = self
+            .running_car
+            .iter()
+            .position(|running_car| &running_car.car_id == car_id)
+        {
             Ok(index)
         } else {
             Err(anyhow!("No such car {}", car_id))
@@ -131,8 +144,11 @@ mod tests {
     use std::sync::Arc;
 
     use async_trait::async_trait;
+    use log::Metadata;
     use tokio::sync::Mutex;
 
+    use crate::config;
+    use crate::config::RecordMetadata;
     use crate::prelude::*;
     use crate::running_observer::*;
 
@@ -155,7 +171,7 @@ mod tests {
 
     #[async_trait]
     impl NextCarQueue for NextCarQueueMock {
-        async fn consume_next_car(&mut self) -> Option<CarId> {
+        async fn consume_next_car(&mut self) -> Option<MetaData> {
             let next = self.counter;
             self.counter += 1;
             Some(format!("{}", next))
@@ -164,7 +180,7 @@ mod tests {
 
     #[async_trait]
     impl NextCarQueue for EmptyNextCarQueueMock {
-        async fn consume_next_car(&mut self) -> Option<CarId> {
+        async fn consume_next_car(&mut self) -> Option<MetaData> {
             None
         }
     }
@@ -174,6 +190,15 @@ mod tests {
         Arc<Mutex<NextCarQueueMock>>,
         Arc<Mutex<RecordServiceMock>>,
     ) {
+        env_logger::builder().is_test(true).try_init();
+        let config = Config {
+                    record: config::Record {
+                        metadata: RecordMetadata {
+                            schema: serde_json::from_str(&r#"{"type": "string"}"#).unwrap(),
+                            default: serde_json::from_str(&r#""default_metadata""#).unwrap(),
+                        },
+                    },
+                };
         let next_car_queue = Arc::new(Mutex::new(NextCarQueueMock { counter: 0 }));
         let record_service = Arc::new(Mutex::new(RecordServiceMock {
             record_lines: Vec::new(),
@@ -181,7 +206,14 @@ mod tests {
 
         let a = next_car_queue.clone();
         let b = record_service.clone();
-        (RunningObserver::new(&Config::default(), next_car_queue, record_service), a, b)
+        (
+            RunningObserver::new(&config,
+                next_car_queue,
+                record_service,
+            ),
+            a,
+            b,
+        )
     }
 
     fn setup_empty_queue() -> (
@@ -189,6 +221,16 @@ mod tests {
         Arc<Mutex<EmptyNextCarQueueMock>>,
         Arc<Mutex<RecordServiceMock>>,
     ) {
+        env_logger::builder().is_test(true).try_init();
+        let config = Config {
+                    record: config::Record {
+                        metadata: RecordMetadata {
+                            schema: serde_json::from_str(&r#"{"type": "string"}"#).unwrap(),
+                            default: serde_json::from_str(&r#""default_metadata""#).unwrap(),
+                        },
+                    },
+                };
+
         let next_car_queue = Arc::new(Mutex::new(EmptyNextCarQueueMock));
         let record_service = Arc::new(Mutex::new(RecordServiceMock {
             record_lines: Vec::new(),
@@ -196,7 +238,11 @@ mod tests {
 
         let a = next_car_queue.clone();
         let b = record_service.clone();
-        (RunningObserver::new(&Config::default(), next_car_queue, record_service), a, b)
+        (
+            RunningObserver::new(&config, next_car_queue, record_service),
+            a,
+            b,
+        )
     }
 
     #[tokio::test]
@@ -204,10 +250,10 @@ mod tests {
         let mut observer = setup();
 
         observer.0.start(0).await.unwrap();
-        observer.0.stop(10, None).await.unwrap();
+        observer.0.stop(10, &None).await.unwrap();
 
         let record = observer.2.lock().await.record_lines.get(0).unwrap().clone();
-        assert_eq!(record.car_id, Some("0".to_string()));
+        assert_eq!(record.meta, "0".to_string());
         assert_eq!(record.duration, 10);
     }
 
@@ -216,10 +262,15 @@ mod tests {
         let mut observer = setup();
 
         observer.0.start(0).await.unwrap();
-        observer.0.stop(10, Some("0".to_string())).await.unwrap();
+
+        observer
+            .0
+            .stop(10, &Some(observer.0.running_car[0].car_id.clone()))
+            .await
+            .unwrap();
 
         let record = observer.2.lock().await.record_lines.get(0).unwrap().clone();
-        assert_eq!(record.car_id, Some("0".to_string()));
+        assert_eq!(record.meta, "0");
         assert_eq!(record.duration, 10);
     }
 
@@ -229,7 +280,11 @@ mod tests {
         let mut observer = setup();
 
         observer.0.start(0).await.unwrap();
-        observer.0.stop(10, Some("unused_id".to_string())).await.unwrap();
+        observer
+            .0
+            .stop(10, &Some("unused_id".to_string()))
+            .await
+            .unwrap();
     }
 
     #[tokio::test]
@@ -238,14 +293,14 @@ mod tests {
 
         observer.0.start(0).await.unwrap();
         observer.0.start(10).await.unwrap();
-        observer.0.stop(20, None).await.unwrap();
-        observer.0.stop(40, None).await.unwrap();
+        observer.0.stop(20, &None).await.unwrap();
+        observer.0.stop(40, &None).await.unwrap();
 
         let record0 = observer.2.lock().await.record_lines.get(0).unwrap().clone();
         let record1 = observer.2.lock().await.record_lines.get(1).unwrap().clone();
-        assert_eq!(record0.car_id, Some("0".to_string()));
+        assert_eq!(record0.meta, "0".to_string());
         assert_eq!(record0.duration, 20);
-        assert_eq!(record1.car_id, Some("1".to_string()));
+        assert_eq!(record1.meta, "1".to_string());
         assert_eq!(record1.duration, 30);
     }
 
@@ -257,7 +312,7 @@ mod tests {
         observer.0.flip_start_or_stop(10).await.unwrap();
 
         let record = observer.2.lock().await.record_lines.get(0).unwrap().clone();
-        assert_eq!(record.car_id, Some("0".to_string()));
+        assert_eq!(record.meta, "0".to_string());
         assert_eq!(record.duration, 10);
     }
 
@@ -266,10 +321,10 @@ mod tests {
         let mut observer = setup_empty_queue();
 
         observer.0.start(0).await.unwrap();
-        observer.0.stop(10, None).await.unwrap();
+        observer.0.stop(10, &None).await.unwrap();
 
         let record = observer.2.lock().await.record_lines.get(0).unwrap().clone();
-        assert_eq!(record.car_id, None);
+        assert_eq!(record.meta, r#""default_metadata""#.to_string());
         assert_eq!(record.duration, 10);
     }
 }

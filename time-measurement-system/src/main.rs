@@ -8,7 +8,8 @@ use crate::config::Config;
 mod prelude {
     pub type TimeStamp = i64;
     pub type Duration = i64;
-    pub type CarId = String;
+    pub type MetaData = String;
+    pub type RunningCarId = String;
 }
 
 mod pending_car_queue;
@@ -42,7 +43,7 @@ async fn main() {
     );
 
     observer.start(0).await.unwrap();
-    observer.stop(0, None).await.unwrap();
+    observer.stop(0, &None).await.unwrap();
 
     println!("Hello, world!");
 }

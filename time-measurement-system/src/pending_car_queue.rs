@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use crate::prelude::*;
 
 struct PendingCar {
-    car_id: CarId,
+    meta: MetaData,
 }
 
 pub struct PendingCarQueue {
@@ -16,12 +16,12 @@ impl PendingCarQueue {
         PendingCarQueue { queue: Vec::new() }
     }
 
-    pub fn insert(&mut self, index: usize, car_id: CarId) -> Result<()> {
+    pub fn insert(&mut self, index: usize, meta: MetaData) -> Result<()> {
         if index > self.queue.len() {
             bail!("Index {} was too large", index);
         }
 
-        self.queue.insert(index, PendingCar { car_id });
+        self.queue.insert(index, PendingCar { meta });
         Ok(())
     }
 
@@ -37,11 +37,11 @@ impl PendingCarQueue {
 
 #[async_trait]
 impl crate::running_observer::NextCarQueue for PendingCarQueue {
-    async fn consume_next_car(&mut self) -> Option<CarId> {
+    async fn consume_next_car(&mut self) -> Option<MetaData> {
         if self.queue.len() == 0 {
             return None;
         }
-        Some(self.queue.remove(0).car_id)
+        Some(self.queue.remove(0).meta)
     }
 }
 

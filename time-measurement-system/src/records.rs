@@ -12,7 +12,6 @@ use crate::running_observer;
 
 #[derive(Clone, Debug)]
 struct Record {
-    pub car_id: Option<CarId>,
     pub record_id: String,
     pub duration: Duration,
     meta: String,
@@ -31,9 +30,8 @@ impl Records {
         }
     }
 
-    pub fn add(&mut self, car_id: &Option<CarId>, duration: &Duration, meta: &String) -> Result<()> {
+    pub fn add(&mut self, duration: &Duration, meta: &String) -> Result<()> {
         let record = Record {
-            car_id: car_id.clone(),
             record_id: nanoid!(),
             duration: duration.clone(),
             meta: meta.clone(),
@@ -86,7 +84,7 @@ impl Records {
 impl running_observer::RecordService for Records {
     async fn record(&mut self, record: running_observer::Record) {
         trace!("An record received via internal interface. ({:?})", &record);
-        if let Err(error) = self.add(&record.car_id, &record.duration, &record.meta) {
+        if let Err(error) = self.add(&record.duration, &record.meta) {
             error!("Failed to insert a record. ({:?})", &record);
         }
     }
