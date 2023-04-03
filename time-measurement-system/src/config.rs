@@ -11,8 +11,13 @@ pub struct Record {
   pub metadata: RecordMetadata
 }
 
+#[derive(Deserialize, Default)]
+pub struct Server {
+  pub addr: String
+}
 
 #[derive(Deserialize, Default)]
 pub struct Config {
-  pub record: Record
+  pub record: Record,
+  pub server: Server
 }

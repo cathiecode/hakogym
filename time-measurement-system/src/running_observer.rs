@@ -34,18 +34,16 @@ pub struct RunningObserver {
     running_car: Vec<RunningCar>,
     meta_schema: JSONSchema,
     default_meta_data: String,
-    next_car_queue: Arc<Mutex<dyn NextCarQueue>>,
-    record_service: Arc<Mutex<dyn RecordService>>,
+    next_car_queue: Arc<Mutex<dyn NextCarQueue + Send>>,
+    record_service: Arc<Mutex<dyn RecordService + Send>>,
 }
 
 impl RunningObserver {
     pub fn new(
         config: &Config,
-        next_car_queue: Arc<Mutex<dyn NextCarQueue>>,
-        record_service: Arc<Mutex<dyn RecordService>>,
+        next_car_queue: Arc<Mutex<dyn NextCarQueue + Send>>,
+        record_service: Arc<Mutex<dyn RecordService + Send>>,
     ) -> RunningObserver {
-        println!("schema: {:?}", config.record.metadata.schema);
-
         RunningObserver {
             next_car_queue,
             running_car: Vec::new(),
@@ -126,6 +124,17 @@ impl RunningObserver {
         }
     }
 
+    pub async fn update_metadata(&mut self, timestamp: TimeStamp, car_id: &RunningCarId, metadata: String) -> Result<()> {
+        trace!("Updating metadata {:?} for id {:?}", metadata, car_id);
+
+        self.validate_metadata(&metadata)?;
+
+        let car_index = self.find_car_index(car_id)?;
+        self.running_car.get_mut(car_index).ok_or(anyhow!("Logic Error"))?.meta = metadata;
+
+        Ok(())
+    }
+
     fn find_car_index(&mut self, car_id: &RunningCarId) -> Result<usize> {
         if let Some(index) = self
             .running_car
@@ -137,6 +146,59 @@ impl RunningObserver {
             Err(anyhow!("No such car {}", car_id))
         }
     }
+
+    fn validate_metadata(&mut self, metadata: &str) -> Result<()> {
+        self.meta_schema.validate(&serde_json::from_str::<serde_json::Value>(metadata)?).map_err(|_| anyhow!("Metadata validation failed!"))
+    }
+}
+
+pub mod server {
+    use std::sync::Arc;
+
+    use async_trait::async_trait;
+    use tokio::sync::Mutex;
+    use tonic::{Request, Response, Status};
+    use crate::proto::{running_observer as proto};
+    use crate::proto::running_observer::running_observer_server;
+
+    use super::RunningObserver;
+
+    #[async_trait]
+    impl running_observer_server::RunningObserver for Arc<Mutex<RunningObserver>> {
+        async fn start(&self, request: Request<proto::StartCommandRequest>) -> Result<Response<proto::CommandReply>, Status> {
+            match self.lock().await.start(request.get_ref().timestamp.clone()).await {
+                Ok(_) => Ok(Response::new(proto::CommandReply {})),
+                Err(error) => Err(Status::failed_precondition(error.to_string()))
+            }
+        }
+
+        async fn stop(&self, request: Request<proto::StopCommandRequest>) -> Result<Response<proto::CommandReply>, Status> {
+            let proto::StopCommandRequest {timestamp, car_id} = request.get_ref();
+
+            match self.lock().await.stop(timestamp.clone(), car_id).await {
+                Ok(_) => Ok(Response::new(proto::CommandReply {})),
+                Err(error) => Err(Status::failed_precondition(error.to_string()))
+            }
+        }
+
+        async fn flip_running_state(&self, request: Request<proto::FlipRunningStateCommandRequest>) -> Result<Response<proto::CommandReply>, Status> {
+            let proto::FlipRunningStateCommandRequest {timestamp} = request.get_ref();
+
+            match self.lock().await.flip_start_or_stop(timestamp.clone()).await {
+                Ok(_) => Ok(Response::new(proto::CommandReply {})),
+                Err(error) => Err(Status::failed_precondition(error.to_string()))
+            }
+        }
+
+        async fn update_metadata(&self, request: Request<proto::UpdateMetadataCommandRequest>) -> Result<Response<proto::CommandReply>, Status> {
+            let proto::UpdateMetadataCommandRequest {timestamp, car_id, metadata} = request.get_ref();
+
+            match self.lock().await.update_metadata(timestamp.clone(), car_id, metadata.clone()).await {
+                Ok(_) => Ok(Response::new(proto::CommandReply {})),
+                Err(error) => Err(Status::failed_precondition(error.to_string()))
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -144,7 +206,6 @@ mod tests {
     use std::sync::Arc;
 
     use async_trait::async_trait;
-    use log::Metadata;
     use tokio::sync::Mutex;
 
     use crate::config;
@@ -190,7 +251,7 @@ mod tests {
         Arc<Mutex<NextCarQueueMock>>,
         Arc<Mutex<RecordServiceMock>>,
     ) {
-        env_logger::builder().is_test(true).try_init();
+        let _ = env_logger::builder().is_test(true).try_init();
         let config = Config {
                     record: config::Record {
                         metadata: RecordMetadata {
@@ -198,6 +259,7 @@ mod tests {
                             default: serde_json::from_str(&r#""default_metadata""#).unwrap(),
                         },
                     },
+                    ..Config::default()
                 };
         let next_car_queue = Arc::new(Mutex::new(NextCarQueueMock { counter: 0 }));
         let record_service = Arc::new(Mutex::new(RecordServiceMock {
@@ -221,7 +283,8 @@ mod tests {
         Arc<Mutex<EmptyNextCarQueueMock>>,
         Arc<Mutex<RecordServiceMock>>,
     ) {
-        env_logger::builder().is_test(true).try_init();
+        let _ = env_logger::builder().is_test(true).try_init();
+
         let config = Config {
                     record: config::Record {
                         metadata: RecordMetadata {
@@ -229,6 +292,7 @@ mod tests {
                             default: serde_json::from_str(&r#""default_metadata""#).unwrap(),
                         },
                     },
+                    ..Config::default()
                 };
 
         let next_car_queue = Arc::new(Mutex::new(EmptyNextCarQueueMock));

@@ -6,5 +6,8 @@
       },
       "default": "Default Metadata"
     }
+  },
+  "server": {
+    "addr": "[::1]:11000"
   }
 }
