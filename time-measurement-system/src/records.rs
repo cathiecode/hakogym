@@ -14,20 +14,26 @@ use crate::Config;
 struct Record {
     pub record_id: String,
     pub duration: Duration,
-    meta: String,
+    pub meta: String,
 }
 
 pub struct Records {
     records: Vec<Record>,
     meta_schema: JSONSchema,
+    on_change: tokio::sync::watch::Sender<Vec<Record>>,
+    watcher: tokio::sync::watch::Receiver<Vec<Record>>,
 }
 
 impl Records {
     pub fn new(config: &Config) -> Self {
+        let records = Vec::new();
+        let (on_change, watcher) = tokio::sync::watch::channel(records.clone());
         Self {
-            records: Vec::new(),
+            records,
             meta_schema: JSONSchema::compile(&config.record.metadata.schema)
-                .unwrap_or_else(|e| panic!("Invalid metadata schema!")),
+                .unwrap_or_else(|e| panic!("Invalid metadata schema! {:?}", e)),
+            on_change,
+            watcher,
         }
     }
 
@@ -43,6 +49,8 @@ impl Records {
         debug!("An Record added. ({:?})", record);
 
         self.records.push(record);
+
+        self.promote_change();
         Ok(())
     }
 
@@ -55,6 +63,8 @@ impl Records {
         if let Some(index) = self.find_record_index(&new_record.record_id) {
             self.validate_record(&new_record)?;
             self.records[index] = new_record;
+
+            self.promote_change();
             Ok(())
         } else {
             bail!("Specified record {:?} was not found.", new_record.record_id);
@@ -65,6 +75,8 @@ impl Records {
     pub fn remove(&mut self, record_id: &str) -> Result<()> {
         if let Some(index) = self.find_record_index(&record_id) {
             self.records.remove(index);
+
+            self.promote_change();
             Ok(())
         } else {
             bail!("Specified record {:?} was not found", record_id);
@@ -73,7 +85,13 @@ impl Records {
 
     pub fn remove_all(&mut self) -> Result<()> {
         self.records.clear();
+
+        self.promote_change();
         Ok(())
+    }
+
+    fn promote_change(&self) {
+        self.on_change.send(self.records.clone());
     }
 
     fn validate_record(&mut self, record: &Record) -> Result<()> {
@@ -92,15 +110,19 @@ impl Records {
 
 pub mod server {
     use async_trait::async_trait;
-    use std::sync::Arc;
+    use std::{pin::Pin, sync::Arc};
     use tokio::sync::Mutex;
+    use tokio_stream::Stream;
     use tonic::{Request, Status};
 
-    use super::{Records};
-    use crate::proto::records as proto;
+    use super::Records;
+    use crate::proto::records::{self as proto, ReadAllReply};
 
     #[async_trait]
     impl proto::pending_car_queue_server::PendingCarQueue for Arc<Mutex<Records>> {
+        type SubscribeChangeStream =
+            Pin<Box<dyn Stream<Item = Result<proto::ReadAllReply, Status>> + Send>>;
+
         async fn insert(
             &self,
             request: Request<proto::InsertRequest>,
@@ -155,7 +177,10 @@ pub mod server {
             &self,
             _request: Request<proto::RemoveAllRequest>,
         ) -> Result<tonic::Response<proto::CommandReply>, Status> {
-            self.lock().await.remove_all().map_err(|e| Status::failed_precondition(e.to_string()))?;
+            self.lock()
+                .await
+                .remove_all()
+                .map_err(|e| Status::failed_precondition(e.to_string()))?;
 
             Ok(tonic::Response::new(proto::CommandReply {}))
         }
@@ -178,6 +203,45 @@ pub mod server {
                     .collect(),
             }))
         }
+
+        async fn subscribe_change(
+            &self,
+            _request: Request<proto::SubscribeChangeRequest>,
+        ) -> Result<tonic::Response<Self::SubscribeChangeStream>, Status> {
+            let (tx, rx) = tokio::sync::mpsc::channel(1);
+            let mut watcher = self.lock().await.watcher.clone();
+            tokio::spawn(async move {
+                while watcher.changed().await.is_ok() {
+                    println!("change received!");
+                    let records = watcher.borrow().clone();
+
+                    match tx
+                        .send(Result::<_, Status>::Ok(ReadAllReply {
+                            item: records
+                                .iter()
+                                .map(|item| proto::InsertedItem {
+                                    id: item.record_id.clone(),
+                                    time: item.duration,
+                                    meta: item.meta.clone(),
+                                })
+                                .collect(),
+                        }))
+                        .await
+                    {
+                        Ok(_) => {},
+                        Err(_item) => {
+                            break;
+                        }
+                    }
+                }
+            });
+
+            let out_stream = tokio_stream::wrappers::ReceiverStream::new(rx);
+
+            Ok(tonic::Response::new(
+                Box::pin(out_stream) as Self::SubscribeChangeStream
+            ))
+        }
     }
 }
 
@@ -186,7 +250,10 @@ impl running_observer::RecordService for Records {
     async fn record(&mut self, record: running_observer::Record) {
         trace!("An record received via internal interface. ({:?})", &record);
         if let Err(error) = self.add(&record.duration, &record.meta) {
-            error!("Failed to insert a record. ({:?})", &record);
+            error!(
+                "Failed to insert a record ({:?}) due to {:?}",
+                &record, error
+            );
         }
     }
 }

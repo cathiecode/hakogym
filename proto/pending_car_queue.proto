@@ -13,6 +13,8 @@ service PendingCarQueue {
     rpc RemoveAll(RemoveAllRequest) returns (CommandReply) {}
     rpc ReplaceAll(ReplaceAllRequest) returns (CommandReply) {}
     rpc ReadAll(ReadAllRequest) returns (ReadAllReply) {}
+
+    rpc SubscribeChange (SubscribeChangeRequest) returns(stream ReadAllReply) {}
 }
 
 message Item {
@@ -60,4 +62,8 @@ message ReadAllRequest {
 
 message ReadAllReply {
     repeated InsertedItem item = 1;
+}
+
+message SubscribeChangeRequest {
+    
 }

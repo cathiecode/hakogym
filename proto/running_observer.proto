@@ -17,6 +17,15 @@ service RunningObserver {
 
   // 走行中の車両のメタデータを更新します。メタデータはconfigファイルのJSON Schemaに従っている必要があります。
   rpc UpdateMetadata(UpdateMetadataCommandRequest) returns (CommandReply) {}
+
+  rpc ReadAll(ReadAllRequest) returns (ReadAllReply) {}
+
+  rpc SubscribeChange (SubscribeChangeRequest) returns(stream ReadAllReply) {}
+}
+
+message Item {
+  int64 start_at = 1;
+  string meta = 2;
 }
 
 message StartCommandRequest {
@@ -38,6 +47,19 @@ message UpdateMetadataCommandRequest {
   string metadata = 3;
 }
 
+message ReadAllRequest {
+
+}
+
+message SubscribeChangeRequest {
+  
+}
+
+
 message CommandReply {
   
+}
+
+message ReadAllReply {
+  repeated Item item = 1;
 }

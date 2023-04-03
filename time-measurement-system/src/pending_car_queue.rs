@@ -5,6 +5,7 @@ use nanoid::nanoid;
 use crate::prelude::*;
 
 // TODO: validate metadata
+#[derive(Clone)]
 struct PendingCar {
     id: String,
     meta: MetaData,
@@ -12,11 +13,16 @@ struct PendingCar {
 
 pub struct PendingCarQueue {
     queue: Vec<PendingCar>,
+    on_change: tokio::sync::watch::Sender<Vec<PendingCar>>,
+    watcher: tokio::sync::watch::Receiver<Vec<PendingCar>>,
 }
 
 impl PendingCarQueue {
     pub fn new() -> Self {
-        PendingCarQueue { queue: Vec::new() }
+        let queue = Vec::new();
+        let (on_change, watcher) = tokio::sync::watch::channel(queue.clone());
+
+        PendingCarQueue { queue, on_change, watcher }
     }
 
     pub fn insert(&mut self, meta: MetaData, index: Option<usize>) -> Result<()> {
@@ -109,12 +115,13 @@ impl crate::running_observer::NextCarQueue for PendingCarQueue {
 
 pub mod server {
     use async_trait::async_trait;
-    use std::sync::Arc;
+    use tokio_stream::Stream;
+    use std::{sync::Arc, pin::Pin};
     use tokio::sync::Mutex;
     use tonic::{Request, Status};
 
     use super::{PendingCarQueue};
-    use crate::proto::pending_car_queue as proto;
+    use crate::proto::pending_car_queue::{self as proto, ReadAllReply};
 
     #[async_trait]
     impl proto::pending_car_queue_server::PendingCarQueue for Arc<Mutex<PendingCarQueue>> {
@@ -224,6 +231,47 @@ pub mod server {
                     })
                     .collect(),
             }))
+        }
+
+        type SubscribeChangeStream =
+            Pin<Box<dyn Stream<Item = Result<proto::ReadAllReply, Status>> + Send>>;
+
+        async fn subscribe_change(
+            &self,
+            _request: Request<proto::SubscribeChangeRequest>,
+        ) -> Result<tonic::Response<Self::SubscribeChangeStream>, Status> {
+            let (tx, rx) = tokio::sync::mpsc::channel(1);
+            let mut watcher = self.lock().await.watcher.clone();
+            tokio::spawn(async move {
+                while watcher.changed().await.is_ok() {
+                    println!("change received!");
+                    let records = watcher.borrow().clone();
+
+                    match tx
+                        .send(Result::<_, Status>::Ok(ReadAllReply {
+                            item: records
+                                .iter()
+                                .map(|item| proto::InsertedItem {
+                                    id: item.id.clone(),
+                                    meta: item.meta.clone(),
+                                })
+                                .collect(),
+                        }))
+                        .await
+                    {
+                        Ok(_) => {}
+                        Err(_item) => {
+                            break;
+                        }
+                    }
+                }
+            });
+
+            let out_stream = tokio_stream::wrappers::ReceiverStream::new(rx);
+
+            Ok(tonic::Response::new(
+                Box::pin(out_stream) as Self::SubscribeChangeStream
+            ))
         }
     }
 }

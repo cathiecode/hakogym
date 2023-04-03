@@ -8,6 +8,7 @@ use tokio::sync::Mutex;
 
 use crate::{prelude::*, Config};
 
+#[derive(Clone)]
 struct RunningCar {
     car_id: RunningCarId,
     start_at: TimeStamp,
@@ -36,6 +37,8 @@ pub struct RunningObserver {
     default_meta_data: String,
     next_car_queue: Arc<Mutex<dyn NextCarQueue + Send>>,
     record_service: Arc<Mutex<dyn RecordService + Send>>,
+    on_change: tokio::sync::watch::Sender<Vec<RunningCar>>,
+    watcher: tokio::sync::watch::Receiver<Vec<RunningCar>>,
 }
 
 impl RunningObserver {
@@ -44,13 +47,18 @@ impl RunningObserver {
         next_car_queue: Arc<Mutex<dyn NextCarQueue + Send>>,
         record_service: Arc<Mutex<dyn RecordService + Send>>,
     ) -> RunningObserver {
+        let running_car = Vec::new();
+        let (on_change, watcher) = tokio::sync::watch::channel(running_car.clone());
+
         RunningObserver {
             next_car_queue,
-            running_car: Vec::new(),
+            running_car,
             record_service,
             meta_schema: JSONSchema::compile(&config.record.metadata.schema)
                 .unwrap_or_else(|e| panic!("Invalid metadata schema! ({:?})", e)),
             default_meta_data: config.record.metadata.default.to_string(),
+            on_change,
+            watcher,
         }
     }
 
@@ -61,7 +69,7 @@ impl RunningObserver {
         self.running_car.push(RunningCar {
             car_id: nanoid!(),
             start_at: timestamp,
-            meta: next_car_metadata.unwrap_or_else(|| {self.default_meta_data.clone()}),
+            meta: next_car_metadata.unwrap_or_else(|| self.default_meta_data.clone()),
         });
 
         Ok(())
@@ -94,7 +102,6 @@ impl RunningObserver {
             timestamp, car_to_stop, stopped_car.meta
         );
 
-
         let duration: Duration = timestamp - stopped_car.start_at;
 
         self.record_service
@@ -124,13 +131,21 @@ impl RunningObserver {
         }
     }
 
-    pub async fn update_metadata(&mut self, timestamp: TimeStamp, car_id: &RunningCarId, metadata: String) -> Result<()> {
+    pub async fn update_metadata(
+        &mut self,
+        timestamp: TimeStamp,
+        car_id: &RunningCarId,
+        metadata: String,
+    ) -> Result<()> {
         trace!("Updating metadata {:?} for id {:?}", metadata, car_id);
 
         self.validate_metadata(&metadata)?;
 
         let car_index = self.find_car_index(car_id)?;
-        self.running_car.get_mut(car_index).ok_or(anyhow!("Logic Error"))?.meta = metadata;
+        self.running_car
+            .get_mut(car_index)
+            .ok_or(anyhow!("Logic Error"))?
+            .meta = metadata;
 
         Ok(())
     }
@@ -148,55 +163,149 @@ impl RunningObserver {
     }
 
     fn validate_metadata(&mut self, metadata: &str) -> Result<()> {
-        self.meta_schema.validate(&serde_json::from_str::<serde_json::Value>(metadata)?).map_err(|_| anyhow!("Metadata validation failed!"))
+        self.meta_schema
+            .validate(&serde_json::from_str::<serde_json::Value>(metadata)?)
+            .map_err(|_| anyhow!("Metadata validation failed!"))
     }
 }
 
 pub mod server {
+    use std::pin::Pin;
     use std::sync::Arc;
 
+    use crate::proto::running_observer as proto;
+    use crate::proto::running_observer::{running_observer_server, ReadAllReply};
     use async_trait::async_trait;
     use tokio::sync::Mutex;
+    use tokio_stream::Stream;
     use tonic::{Request, Response, Status};
-    use crate::proto::{running_observer as proto};
-    use crate::proto::running_observer::running_observer_server;
 
     use super::RunningObserver;
 
     #[async_trait]
     impl running_observer_server::RunningObserver for Arc<Mutex<RunningObserver>> {
-        async fn start(&self, request: Request<proto::StartCommandRequest>) -> Result<Response<proto::CommandReply>, Status> {
-            match self.lock().await.start(request.get_ref().timestamp.clone()).await {
+        type SubscribeChangeStream =
+            Pin<Box<dyn Stream<Item = Result<proto::ReadAllReply, Status>> + Send>>;
+
+        async fn start(
+            &self,
+            request: Request<proto::StartCommandRequest>,
+        ) -> Result<Response<proto::CommandReply>, Status> {
+            match self
+                .lock()
+                .await
+                .start(request.get_ref().timestamp.clone())
+                .await
+            {
                 Ok(_) => Ok(Response::new(proto::CommandReply {})),
-                Err(error) => Err(Status::failed_precondition(error.to_string()))
+                Err(error) => Err(Status::failed_precondition(error.to_string())),
             }
         }
 
-        async fn stop(&self, request: Request<proto::StopCommandRequest>) -> Result<Response<proto::CommandReply>, Status> {
-            let proto::StopCommandRequest {timestamp, car_id} = request.get_ref();
+        async fn stop(
+            &self,
+            request: Request<proto::StopCommandRequest>,
+        ) -> Result<Response<proto::CommandReply>, Status> {
+            let proto::StopCommandRequest { timestamp, car_id } = request.get_ref();
 
             match self.lock().await.stop(timestamp.clone(), car_id).await {
                 Ok(_) => Ok(Response::new(proto::CommandReply {})),
-                Err(error) => Err(Status::failed_precondition(error.to_string()))
+                Err(error) => Err(Status::failed_precondition(error.to_string())),
             }
         }
 
-        async fn flip_running_state(&self, request: Request<proto::FlipRunningStateCommandRequest>) -> Result<Response<proto::CommandReply>, Status> {
-            let proto::FlipRunningStateCommandRequest {timestamp} = request.get_ref();
+        async fn flip_running_state(
+            &self,
+            request: Request<proto::FlipRunningStateCommandRequest>,
+        ) -> Result<Response<proto::CommandReply>, Status> {
+            let proto::FlipRunningStateCommandRequest { timestamp } = request.get_ref();
 
-            match self.lock().await.flip_start_or_stop(timestamp.clone()).await {
+            match self
+                .lock()
+                .await
+                .flip_start_or_stop(timestamp.clone())
+                .await
+            {
                 Ok(_) => Ok(Response::new(proto::CommandReply {})),
-                Err(error) => Err(Status::failed_precondition(error.to_string()))
+                Err(error) => Err(Status::failed_precondition(error.to_string())),
             }
         }
 
-        async fn update_metadata(&self, request: Request<proto::UpdateMetadataCommandRequest>) -> Result<Response<proto::CommandReply>, Status> {
-            let proto::UpdateMetadataCommandRequest {timestamp, car_id, metadata} = request.get_ref();
+        async fn update_metadata(
+            &self,
+            request: Request<proto::UpdateMetadataCommandRequest>,
+        ) -> Result<Response<proto::CommandReply>, Status> {
+            let proto::UpdateMetadataCommandRequest {
+                timestamp,
+                car_id,
+                metadata,
+            } = request.get_ref();
 
-            match self.lock().await.update_metadata(timestamp.clone(), car_id, metadata.clone()).await {
+            match self
+                .lock()
+                .await
+                .update_metadata(timestamp.clone(), car_id, metadata.clone())
+                .await
+            {
                 Ok(_) => Ok(Response::new(proto::CommandReply {})),
-                Err(error) => Err(Status::failed_precondition(error.to_string()))
+                Err(error) => Err(Status::failed_precondition(error.to_string())),
             }
+        }
+
+        async fn read_all(
+            &self,
+            request: Request<proto::ReadAllRequest>,
+        ) -> Result<Response<proto::ReadAllReply>, Status> {
+            Ok(tonic::Response::new(proto::ReadAllReply {
+                item: self
+                    .lock()
+                    .await
+                    .running_car
+                    .iter()
+                    .map(|item| proto::Item {
+                        start_at: item.start_at,
+                        meta: item.meta.clone(),
+                    })
+                    .collect()
+            }))
+        }
+
+        async fn subscribe_change(
+            &self,
+            _request: Request<proto::SubscribeChangeRequest>,
+        ) -> Result<tonic::Response<Self::SubscribeChangeStream>, Status> {
+            let (tx, rx) = tokio::sync::mpsc::channel(1);
+            let mut watcher = self.lock().await.watcher.clone();
+            tokio::spawn(async move {
+                while watcher.changed().await.is_ok() {
+                    println!("change received!");
+                    let records = watcher.borrow().clone();
+
+                    match tx
+                        .send(Result::<_, Status>::Ok(ReadAllReply {
+                            item: records
+                                .iter()
+                                .map(|item| proto::Item {
+                                    start_at: item.start_at,
+                                    meta: item.meta.clone(),
+                                })
+                                .collect(),
+                        }))
+                        .await
+                    {
+                        Ok(_) => {}
+                        Err(_item) => {
+                            break;
+                        }
+                    }
+                }
+            });
+
+            let out_stream = tokio_stream::wrappers::ReceiverStream::new(rx);
+
+            Ok(tonic::Response::new(
+                Box::pin(out_stream) as Self::SubscribeChangeStream
+            ))
         }
     }
 }
@@ -253,14 +362,14 @@ mod tests {
     ) {
         let _ = env_logger::builder().is_test(true).try_init();
         let config = Config {
-                    record: config::Record {
-                        metadata: RecordMetadata {
-                            schema: serde_json::from_str(&r#"{"type": "string"}"#).unwrap(),
-                            default: serde_json::from_str(&r#""default_metadata""#).unwrap(),
-                        },
-                    },
-                    ..Config::default()
-                };
+            record: config::Record {
+                metadata: RecordMetadata {
+                    schema: serde_json::from_str(&r#"{"type": "string"}"#).unwrap(),
+                    default: serde_json::from_str(&r#""default_metadata""#).unwrap(),
+                },
+            },
+            ..Config::default()
+        };
         let next_car_queue = Arc::new(Mutex::new(NextCarQueueMock { counter: 0 }));
         let record_service = Arc::new(Mutex::new(RecordServiceMock {
             record_lines: Vec::new(),
@@ -269,10 +378,7 @@ mod tests {
         let a = next_car_queue.clone();
         let b = record_service.clone();
         (
-            RunningObserver::new(&config,
-                next_car_queue,
-                record_service,
-            ),
+            RunningObserver::new(&config, next_car_queue, record_service),
             a,
             b,
         )
@@ -286,14 +392,14 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let config = Config {
-                    record: config::Record {
-                        metadata: RecordMetadata {
-                            schema: serde_json::from_str(&r#"{"type": "string"}"#).unwrap(),
-                            default: serde_json::from_str(&r#""default_metadata""#).unwrap(),
-                        },
-                    },
-                    ..Config::default()
-                };
+            record: config::Record {
+                metadata: RecordMetadata {
+                    schema: serde_json::from_str(&r#"{"type": "string"}"#).unwrap(),
+                    default: serde_json::from_str(&r#""default_metadata""#).unwrap(),
+                },
+            },
+            ..Config::default()
+        };
 
         let next_car_queue = Arc::new(Mutex::new(EmptyNextCarQueueMock));
         let record_service = Arc::new(Mutex::new(RecordServiceMock {
