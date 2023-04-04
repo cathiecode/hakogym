@@ -4,7 +4,7 @@ package has.records;
 
 import "google/protobuf/wrappers.proto";
 
-service PendingCarQueue {
+service Records {
     rpc Insert(InsertRequest) returns (CommandReply) {}
     rpc Remove(RemoveRequest) returns (CommandReply) {}
     rpc Update(UpdateRequest) returns (CommandReply) {}

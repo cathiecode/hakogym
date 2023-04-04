@@ -1,11 +1,13 @@
 use anyhow::{anyhow, bail, Result};
 use async_trait::async_trait;
+use jsonschema::JSONSchema;
+use log::{error, trace};
 use nanoid::nanoid;
 
-use crate::prelude::*;
+use crate::{config::Config, prelude::*};
 
 // TODO: validate metadata
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct PendingCar {
     id: String,
     meta: MetaData,
@@ -13,23 +15,33 @@ struct PendingCar {
 
 pub struct PendingCarQueue {
     queue: Vec<PendingCar>,
+    meta_schema: JSONSchema,
     on_change: tokio::sync::watch::Sender<Vec<PendingCar>>,
     watcher: tokio::sync::watch::Receiver<Vec<PendingCar>>,
 }
 
 impl PendingCarQueue {
-    pub fn new() -> Self {
+    pub fn new(config: &Config) -> Self {
         let queue = Vec::new();
         let (on_change, watcher) = tokio::sync::watch::channel(queue.clone());
 
-        PendingCarQueue { queue, on_change, watcher }
+        PendingCarQueue {
+            queue,
+            meta_schema: JSONSchema::compile(&config.record.metadata.schema)
+                .unwrap_or_else(|e| panic!("Invalid metadata schema! {:?}", e)),
+            on_change,
+            watcher,
+        }
     }
 
     pub fn insert(&mut self, meta: MetaData, index: Option<usize>) -> Result<()> {
+        trace!("Inserting");
         let car = PendingCar {
             id: nanoid!(),
             meta,
         };
+
+        self.validate_record(&car)?;
 
         if let Some(index) = index {
             if index > self.queue.len() {
@@ -41,21 +53,38 @@ impl PendingCarQueue {
             self.queue.push(car);
         }
 
+        self.promote_change();
+
         Ok(())
     }
 
     pub fn remove(&mut self, id: &str) -> Result<()> {
+        trace!("Removing");
         let index = self.find_car_index(id)?;
         self.queue.remove(index);
+        self.promote_change();
         Ok(())
     }
 
     pub fn update(&mut self, id: &str, meta: String) -> Result<()> {
+        trace!("Updating metadata {:?} for id {:?}", meta, id);
         let index = self.find_car_index(id)?;
-        self.queue
-            .get_mut(index)
-            .ok_or(anyhow!("Logic Error"))?
-            .meta = meta;
+
+        let current_record = self.queue.get(index).ok_or(anyhow!("Logic Error"))?;
+
+        let new_record = PendingCar {
+            meta,
+            ..current_record.clone()
+        };
+
+        /*self.queue
+        .get_mut(index)
+        .ok_or(anyhow!("Logic Error"))?
+        .meta = meta;*/
+
+        *self.queue.get_mut(index).ok_or(anyhow!("Logic Error"))? = new_record;
+
+        self.promote_change();
         Ok(())
     }
 
@@ -64,7 +93,7 @@ impl PendingCarQueue {
         metas: impl Iterator<Item = String>,
         position: Option<usize>,
     ) -> Result<()> {
-        // TODO: validate metadata
+        trace!("Insert many");
 
         let position = position.unwrap_or(self.queue.len());
 
@@ -72,25 +101,51 @@ impl PendingCarQueue {
             bail!("Index {} was too large", position);
         }
 
-        self.queue.splice(
-            &position..&position,
-            metas
-                .map(|meta| PendingCar {
-                    id: nanoid!(),
-                    meta,
-                })
-                .collect::<Vec<PendingCar>>(),
-        );
+        let new_records = metas
+            .map(|meta| PendingCar {
+                id: nanoid!(),
+                meta,
+            })
+            .collect::<Vec<PendingCar>>();
 
+        if !new_records
+            .iter()
+            .all(|record| self.validate_record(record).is_ok())
+        {
+            bail!("Request includes invalid record!");
+        }
+
+        self.queue.splice(&position..&position, new_records);
+
+        self.promote_change();
         Ok(())
     }
 
     pub fn remove_all(&mut self) {
+        trace!("Remove all");
         self.queue.clear();
+        self.promote_change();
     }
 
     pub fn replace(&mut self, metas: impl Iterator<Item = String>) -> Result<()> {
-        self.queue = metas.map(|meta| {PendingCar {id: nanoid!(), meta}}).collect::<Vec<PendingCar>>();
+        trace!("Replacing");
+
+        let new_records = metas
+            .map(|meta| PendingCar {
+                id: nanoid!(),
+                meta,
+            })
+            .collect::<Vec<PendingCar>>();
+
+        if !new_records
+            .iter()
+            .all(|record| self.validate_record(record).is_ok())
+        {
+            bail!("Request includes invalid record!");
+        }
+
+        self.queue = new_records;
+        self.promote_change();
         Ok(())
     }
 
@@ -100,6 +155,22 @@ impl PendingCarQueue {
         } else {
             Err(anyhow!("No such car {}", car_id))
         }
+    }
+
+    fn promote_change(&self) {
+        trace!("Promoting change");
+        if let Err(error) = self.on_change.send(self.queue.clone()) {
+            error!("Failed to promote change. ({:?})", error);
+        }
+    }
+
+    fn validate_record(&mut self, pending_car: &PendingCar) -> Result<()> {
+        self.meta_schema
+            .validate(&serde_json::from_str::<serde_json::Value>(
+                &pending_car.meta,
+            )?)
+            .map_err(|_| anyhow!("Metadata validation failed."))?;
+        Ok(())
     }
 }
 
@@ -115,12 +186,13 @@ impl crate::running_observer::NextCarQueue for PendingCarQueue {
 
 pub mod server {
     use async_trait::async_trait;
-    use tokio_stream::Stream;
-    use std::{sync::Arc, pin::Pin};
+    use log::trace;
+    use std::{pin::Pin, sync::Arc};
     use tokio::sync::Mutex;
+    use tokio_stream::Stream;
     use tonic::{Request, Status};
 
-    use super::{PendingCarQueue};
+    use super::PendingCarQueue;
     use crate::proto::pending_car_queue::{self as proto, ReadAllReply};
 
     #[async_trait]
@@ -137,7 +209,10 @@ pub mod server {
 
             self.lock()
                 .await
-                .insert(item.meta.clone(), position.map(|position| position as usize))
+                .insert(
+                    item.meta.clone(),
+                    position.map(|position| position as usize),
+                )
                 .map_err(|e| Status::failed_precondition(e.to_string()))?;
 
             Ok(tonic::Response::new(proto::CommandReply {}))
@@ -243,8 +318,9 @@ pub mod server {
             let (tx, rx) = tokio::sync::mpsc::channel(1);
             let mut watcher = self.lock().await.watcher.clone();
             tokio::spawn(async move {
+                trace!("Change receiver spawned");
                 while watcher.changed().await.is_ok() {
-                    println!("change received!");
+                    trace!("change received!");
                     let records = watcher.borrow().clone();
 
                     match tx
@@ -265,6 +341,7 @@ pub mod server {
                         }
                     }
                 }
+                trace!("Change receiver closed");
             });
 
             let out_stream = tokio_stream::wrappers::ReceiverStream::new(rx);
@@ -278,11 +355,25 @@ pub mod server {
 
 #[cfg(test)]
 mod tests {
-    use crate::{pending_car_queue::PendingCarQueue, running_observer::NextCarQueue};
+    use crate::{pending_car_queue::PendingCarQueue, running_observer::NextCarQueue, config::{Config, self, RecordMetadata}};
+
+    fn setup() -> (PendingCarQueue,) {
+        let config = Config {
+            record: config::Record {
+                metadata: RecordMetadata {
+                    schema: serde_json::from_str(&r#"{"type": "string"}"#).unwrap(),
+                    default: serde_json::from_str(&r#""default_metadata""#).unwrap(),
+                },
+            },
+            ..Config::default()
+        };
+
+        (PendingCarQueue::new(&config),)
+    }
 
     #[tokio::test]
     async fn works_when_added() {
-        let mut queue = PendingCarQueue::new();
+        let mut queue = setup().0;
 
         queue.insert("0".to_string(), None).unwrap();
         queue.insert("1".to_string(), Some(1)).unwrap();
@@ -293,14 +384,14 @@ mod tests {
 
     #[tokio::test]
     async fn error_when_added_with_too_large_index() {
-        let mut queue = PendingCarQueue::new();
+        let mut queue = setup().0;
 
         queue.insert("10".to_string(), Some(1)).unwrap_err();
     }
 
     #[tokio::test]
     async fn works_when_removed() {
-        let mut queue = PendingCarQueue::new();
+        let mut queue = setup().0;
 
         queue.insert("0".to_string(), None).unwrap();
         queue.insert("1".to_string(), Some(1)).unwrap();
@@ -314,7 +405,7 @@ mod tests {
 
     #[tokio::test]
     async fn error_when_removed_with_unknown_index() {
-        let mut queue = PendingCarQueue::new();
+        let mut queue = setup().0;
 
         queue.insert("10".to_string(), None).unwrap();
 

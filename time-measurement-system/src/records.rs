@@ -91,7 +91,9 @@ impl Records {
     }
 
     fn promote_change(&self) {
-        self.on_change.send(self.records.clone());
+        if let Err(error) = self.on_change.send(self.records.clone()) {
+            error!("Failed to promote change. ({:?})", error);
+        }
     }
 
     fn validate_record(&mut self, record: &Record) -> Result<()> {
@@ -110,6 +112,7 @@ impl Records {
 
 pub mod server {
     use async_trait::async_trait;
+    use log::trace;
     use std::{pin::Pin, sync::Arc};
     use tokio::sync::Mutex;
     use tokio_stream::Stream;
@@ -119,7 +122,7 @@ pub mod server {
     use crate::proto::records::{self as proto, ReadAllReply};
 
     #[async_trait]
-    impl proto::pending_car_queue_server::PendingCarQueue for Arc<Mutex<Records>> {
+    impl proto::records_server::Records for Arc<Mutex<Records>> {
         type SubscribeChangeStream =
             Pin<Box<dyn Stream<Item = Result<proto::ReadAllReply, Status>> + Send>>;
 
@@ -212,7 +215,7 @@ pub mod server {
             let mut watcher = self.lock().await.watcher.clone();
             tokio::spawn(async move {
                 while watcher.changed().await.is_ok() {
-                    println!("change received!");
+                    trace!("change received!");
                     let records = watcher.borrow().clone();
 
                     match tx
@@ -248,7 +251,7 @@ pub mod server {
 #[async_trait]
 impl running_observer::RecordService for Records {
     async fn record(&mut self, record: running_observer::Record) {
-        trace!("An record received via internal interface. ({:?})", &record);
+        debug!("An record received via internal interface. ({:?})", &record);
         if let Err(error) = self.add(&record.duration, &record.meta) {
             error!(
                 "Failed to insert a record ({:?}) due to {:?}",

@@ -176,6 +176,7 @@ pub mod server {
     use crate::proto::running_observer as proto;
     use crate::proto::running_observer::{running_observer_server, ReadAllReply};
     use async_trait::async_trait;
+    use log::trace;
     use tokio::sync::Mutex;
     use tokio_stream::Stream;
     use tonic::{Request, Response, Status};
@@ -278,7 +279,7 @@ pub mod server {
             let mut watcher = self.lock().await.watcher.clone();
             tokio::spawn(async move {
                 while watcher.changed().await.is_ok() {
-                    println!("change received!");
+                    trace!("change received!");
                     let records = watcher.borrow().clone();
 
                     match tx

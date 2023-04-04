@@ -2,7 +2,12 @@
   "record": {
     "metadata": {
       "schema": {
-        "type": "string"
+        "type": "object",
+        "properties": {
+          "carId": {
+            "type": "string"
+          }
+        }
       },
       "default": "Default Metadata"
     }
