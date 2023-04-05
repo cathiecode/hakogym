@@ -12,6 +12,8 @@ function MetaCellsInner(props: MetaCellsProps) {
   return (
     <>
       <td>{value.carId}</td>
+      <td>{value.pylonTouchCount}</td>
+      <td>{value.derailmentCount}</td>
     </>
   );
 }

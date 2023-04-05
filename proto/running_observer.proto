@@ -26,6 +26,7 @@ service RunningObserver {
 message Item {
   int64 start_at = 1;
   string meta = 2;
+  string id = 3;
 }
 
 message StartCommandRequest {
@@ -34,7 +35,7 @@ message StartCommandRequest {
 
 message StopCommandRequest {
   int64 timestamp = 1;
-  google.protobuf.StringValue car_id = 2;
+  google.protobuf.StringValue id = 2;
 }
 
 message FlipRunningStateCommandRequest {
@@ -43,7 +44,7 @@ message FlipRunningStateCommandRequest {
 
 message UpdateMetadataCommandRequest {
   int64 timestamp = 1;
-  string car_id = 2;
+  string id = 2;
   string metadata = 3;
 }
 

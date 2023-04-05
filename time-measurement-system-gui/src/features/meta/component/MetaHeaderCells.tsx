@@ -1,7 +1,9 @@
 export default function MetaHeaderCells() {
   return (
     <>
-      <th>テキスト</th>
+      <th>ゼッケン番号</th>
+      <th>パイロン</th>
+      <th>脱輪</th>
     </>
   );
 }

@@ -180,6 +180,8 @@ impl crate::running_observer::NextCarQueue for PendingCarQueue {
         if self.queue.len() == 0 {
             return None;
         }
+
+        self.promote_change();
         Some(self.queue.remove(0).meta)
     }
 }
@@ -355,7 +357,11 @@ pub mod server {
 
 #[cfg(test)]
 mod tests {
-    use crate::{pending_car_queue::PendingCarQueue, running_observer::NextCarQueue, config::{Config, self, RecordMetadata}};
+    use crate::{
+        config::{self, Config, RecordMetadata},
+        pending_car_queue::PendingCarQueue,
+        running_observer::NextCarQueue,
+    };
 
     fn setup() -> (PendingCarQueue,) {
         let config = Config {

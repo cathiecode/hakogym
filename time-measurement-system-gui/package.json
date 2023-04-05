@@ -16,6 +16,8 @@
     "@protobuf-ts/plugin": "^2.8.3",
     "@tauri-apps/api": "^1.2.0",
     "bootstrap": "^5.2.3",
+    "classnames": "^2.3.2",
+    "date-fns": "^2.29.3",
     "google-protobuf": "^3.21.2",
     "grpc-web": "^1.4.2",
     "react": "^18.2.0",
@@ -44,6 +46,7 @@
     "eslint-plugin-n": "^15.7.0",
     "eslint-plugin-promise": "^6.1.1",
     "eslint-plugin-react": "^7.32.2",
+    "eslint-plugin-react-hooks": "^4.6.0",
     "protoc-gen-ts": "^0.8.6",
     "typescript": "^4.9.5",
     "vite": "^4.0.0"

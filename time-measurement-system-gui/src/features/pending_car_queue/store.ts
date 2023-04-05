@@ -6,8 +6,7 @@ import useSWRSubscription, {
 
 import { PendingCarQueueClient } from "../../types/proto/pending_car_queue.client";
 import { useCallback } from "react";
-import { InsertedItem, ReadAllReply } from "../../types/proto/pending_car_queue";
-import { ParsedMetaData, packMetaData } from "../meta/types";
+import { InsertedItem, Item, ReadAllReply } from "../../types/proto/pending_car_queue";
 
 const client = () =>
   new PendingCarQueueClient(
@@ -42,9 +41,9 @@ export const useList = () => {
   );
 
   const insert = useCallback(
-    async (meta: ParsedMetaData, position: number | undefined = undefined) => {
+    async (item: Item, position: number | undefined = undefined) => {
       await client().insert({
-        item: { meta: packMetaData(meta) },
+        item,
         position: position !== undefined ? { value: position } : undefined,
       }).response;
     },
@@ -62,10 +61,15 @@ export const useList = () => {
     //swr.mutate();
   }, []);
 
+  const removeAll = useCallback(async () => {
+    await client().removeAll({}).response;
+  }, []);
+
   return {
     ...swr,
     insert,
     remove,
-    update
+    update,
+    removeAll
   };
 };

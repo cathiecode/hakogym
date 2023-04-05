@@ -1,14 +1,14 @@
 use anyhow::{anyhow, bail, Result};
 use async_trait::async_trait;
-use jsonschema::JSONSchema;
-use log::{debug, trace};
+use jsonschema::{JSONSchema, ValidationError};
+use log::{debug, error, trace};
 use nanoid::nanoid;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
 use crate::{prelude::*, Config};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct RunningCar {
     car_id: RunningCarId,
     start_at: TimeStamp,
@@ -49,16 +49,26 @@ impl RunningObserver {
     ) -> RunningObserver {
         let running_car = Vec::new();
         let (on_change, watcher) = tokio::sync::watch::channel(running_car.clone());
+        let meta_schema = JSONSchema::compile(&config.record.metadata.schema)
+            .unwrap_or_else(|e| panic!("Invalid metadata schema! ({:?})", e));
+
+        meta_schema
+            .validate(&config.record.metadata.default)
+            .unwrap_or_else(|e| {
+                panic!(
+                    "Invalid default metadata! ({:?})",
+                    e.collect::<Vec<ValidationError>>()
+                )
+            });
 
         RunningObserver {
             next_car_queue,
             running_car,
             record_service,
-            meta_schema: JSONSchema::compile(&config.record.metadata.schema)
-                .unwrap_or_else(|e| panic!("Invalid metadata schema! ({:?})", e)),
-            default_meta_data: config.record.metadata.default.to_string(),
+            meta_schema,
             on_change,
             watcher,
+            default_meta_data: config.record.metadata.default.to_string(),
         }
     }
 
@@ -72,6 +82,7 @@ impl RunningObserver {
             meta: next_car_metadata.unwrap_or_else(|| self.default_meta_data.clone()),
         });
 
+        self.promote_change();
         Ok(())
     }
 
@@ -115,6 +126,7 @@ impl RunningObserver {
 
         trace!("Done stop process.");
 
+        self.promote_change();
         Ok(())
     }
 
@@ -123,10 +135,12 @@ impl RunningObserver {
         if self.running_car.len() == 0 {
             debug!("Nobody running so starting.");
             self.start(timestamp).await?;
+            self.promote_change();
             Ok(())
         } else {
             debug!("Someone running so stopping.");
             self.stop(timestamp, &None).await?;
+            self.promote_change();
             Ok(())
         }
     }
@@ -147,6 +161,7 @@ impl RunningObserver {
             .ok_or(anyhow!("Logic Error"))?
             .meta = metadata;
 
+        self.promote_change();
         Ok(())
     }
 
@@ -166,6 +181,13 @@ impl RunningObserver {
         self.meta_schema
             .validate(&serde_json::from_str::<serde_json::Value>(metadata)?)
             .map_err(|_| anyhow!("Metadata validation failed!"))
+    }
+
+    fn promote_change(&self) {
+        trace!("Promoting change");
+        if let Err(error) = self.on_change.send(self.running_car.clone()) {
+            error!("Failed to promote change. ({:?})", error);
+        }
     }
 }
 
@@ -207,9 +229,9 @@ pub mod server {
             &self,
             request: Request<proto::StopCommandRequest>,
         ) -> Result<Response<proto::CommandReply>, Status> {
-            let proto::StopCommandRequest { timestamp, car_id } = request.get_ref();
+            let proto::StopCommandRequest { timestamp, id } = request.get_ref();
 
-            match self.lock().await.stop(timestamp.clone(), car_id).await {
+            match self.lock().await.stop(timestamp.clone(), id).await {
                 Ok(_) => Ok(Response::new(proto::CommandReply {})),
                 Err(error) => Err(Status::failed_precondition(error.to_string())),
             }
@@ -238,14 +260,14 @@ pub mod server {
         ) -> Result<Response<proto::CommandReply>, Status> {
             let proto::UpdateMetadataCommandRequest {
                 timestamp,
-                car_id,
+                id,
                 metadata,
             } = request.get_ref();
 
             match self
                 .lock()
                 .await
-                .update_metadata(timestamp.clone(), car_id, metadata.clone())
+                .update_metadata(timestamp.clone(), id, metadata.clone())
                 .await
             {
                 Ok(_) => Ok(Response::new(proto::CommandReply {})),
@@ -264,10 +286,11 @@ pub mod server {
                     .running_car
                     .iter()
                     .map(|item| proto::Item {
+                        id: item.car_id.clone(),
                         start_at: item.start_at,
                         meta: item.meta.clone(),
                     })
-                    .collect()
+                    .collect(),
             }))
         }
 
@@ -287,6 +310,7 @@ pub mod server {
                             item: records
                                 .iter()
                                 .map(|item| proto::Item {
+                                    id: item.car_id.clone(),
                                     start_at: item.start_at,
                                     meta: item.meta.clone(),
                                 })

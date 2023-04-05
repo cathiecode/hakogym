@@ -6,10 +6,37 @@
         "properties": {
           "carId": {
             "type": "string"
+          },
+          "pylonTouchCount": {
+            "type": "number"
+          },
+          "derailmentCount": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["DNS", "MC", "DNF"]
+          },
+          "removed": {
+            "type": "boolean"
+          },
+          "heat": {
+            "type": "number"
           }
-        }
+        },
+        "required": [
+          "carId",
+          "pylonTouchCount",
+          "derailmentCount",
+          "removed"
+        ]
       },
-      "default": "Default Metadata"
+      "default": {
+        "carId": "",
+        "pylonTouchCount": 0,
+        "derailmentCount": 0,
+        "removed": false
+      }
     }
   },
   "server": {

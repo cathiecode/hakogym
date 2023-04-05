@@ -1,15 +1,16 @@
 import { Tab, Tabs } from "react-bootstrap";
 import Todo from "./ui/Todo";
 import Home from "./pages/Home";
+import Sensor from "./pages/Sensor";
 
 export default function Router() {
   return (
-    <Tabs className="my-2 px-2">
+    <Tabs className="mt-2 mb-3 px-2">
       <Tab eventKey="home" title="Home">
         <Home />
       </Tab>
       <Tab eventKey="signalio" title="光電管">
-        <Todo />
+        <Sensor />
       </Tab>
       <Tab eventKey="spreadsheet" title="スプレッドシート">
         <Todo />
