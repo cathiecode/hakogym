@@ -1,4 +1,16 @@
-.row--highlighted {
-    background-color: #ddf;
+.table thead th {
+  box-sizing: border-box;
+  position: sticky;
+  top: 0;
+  background-color: #fff;
 }
 
+.tbody--running {
+  position: sticky;
+  bottom: 0;
+  background-color: #fff;
+}
+
+.row--highlighted {
+  background-color: #9cf;
+}

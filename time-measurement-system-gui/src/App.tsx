@@ -3,11 +3,13 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import Barrier from "./ui/Barrier";
 import { Toaster } from "react-hot-toast";
 
+import "./App.css"
+
 function App() {
   return (
     <Barrier>
-      <Toaster position="bottom-right" />
       <Router />
+      <Toaster position="bottom-right" />
     </Barrier>
   );
 }

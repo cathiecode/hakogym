@@ -13,7 +13,6 @@ import styles from "./styles.module.css";
 import Timer from "../../../../ui/Timer";
 import useRecords from "../../../records/store";
 import { formatDuration } from "../../../../utils/formatDuration";
-import { PendingCarQueue } from "../../../../types/proto/pending_car_queue";
 
 const cx = classNames.bind(styles);
 
@@ -25,7 +24,7 @@ export default function CombinedTable() {
   const highlightPendingCarQueueHead = runningObserver.data?.item.length === 0;
 
   return (
-    <Table hover responsive style={{ tableLayout: "fixed" }}>
+    <Table className={cx("table")} hover bordered style={{ tableLayout: "fixed" }}>
       <thead>
         <tr>
           <th>ステータス</th>
@@ -43,6 +42,8 @@ export default function CombinedTable() {
             <td></td>
           </tr>
         ))}
+      </tbody>
+      <tbody className={cx("tbody--running")}>
         {runningObserver.data?.item.map((item, i) => (
           <tr key={i} className={cx("row--highlighted")}>
             <td>出走中</td>
@@ -55,6 +56,8 @@ export default function CombinedTable() {
             </td>
           </tr>
         ))}
+      </tbody>
+      <tbody>
         {pendingCarQueue.data?.item.length === 0 &&
         runningObserver.data?.item.length === 0 ? (
           <tr
@@ -67,7 +70,9 @@ export default function CombinedTable() {
         {pendingCarQueue.data?.item.map((item, i) => (
           <tr
             key={item.id}
-            className={cx({ "row--highlighted": i === 0 && highlightPendingCarQueueHead })}
+            className={cx({
+              "row--highlighted": i === 0 && highlightPendingCarQueueHead,
+            })}
           >
             <td>{i === 0 ? "次の出走車" : "出走待ち"}</td>
             <QueueRow

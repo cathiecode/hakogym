@@ -6,5 +6,5 @@ type PageProps = {
 };
 
 export default function Page({ children }: PageProps) {
-  return <Barrier><div  data-beacon="beacon">{children}</div></Barrier>;
+  return <Barrier>{children}</Barrier>;
 }

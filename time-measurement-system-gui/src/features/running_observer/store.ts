@@ -4,6 +4,8 @@ import useSWRSubscription, { SWRSubscriptionOptions } from "swr/subscription";
 import { ReadAllReply } from "../../types/proto/running_observer";
 import { RunningObserverClient } from "../../types/proto/running_observer.client";
 import { useCallback } from "react";
+import { packMetaData, parseMetaData } from "../meta/types";
+import { ParsedMetaData } from "../meta/types";
 
 const client = () =>
   new RunningObserverClient(
@@ -48,11 +50,66 @@ export const useRunnningObserverState = () => {
   const forceStop = useCallback(
     async (id?: string) =>
       await client().stop({
-        id: id ? {value: id} : undefined,
+        id: id ? { value: id } : undefined,
         timestamp: BigInt(Date.now()),
       }),
     []
   );
 
-  return { forceStart, forceStop, ...swr };
+  const updateMetadata = useCallback(async (id: string, meta: string) => {
+    await client().updateMetadata({
+      timestamp: BigInt(Date.now()),
+      id: id,
+      metadata: meta,
+    });
+  }, []);
+
+  const getMetaData = useCallback(async (id: string) => {
+    const item = (await client().readAll({})).response.item.find(
+      (item) => item.id === id
+    );
+
+    if (!item) {
+      throw "アイテムが見つかりませんでした";
+    }
+
+    const metaData = parseMetaData(item.meta);
+
+    return metaData;
+  }, []);
+
+  const changeMetaData = useCallback(
+    async (
+      id: string,
+      setter: (metaData: ParsedMetaData) => ParsedMetaData
+    ) => {
+      const metaData = await getMetaData(id);
+      await updateMetadata(id, packMetaData(setter(metaData)));
+    },
+    [getMetaData, updateMetadata]
+  );
+
+  const dnf = useCallback(
+    async (id: string) => {
+      await changeMetaData(id, metadata => ({...metadata, status: "DNF"}));
+      await forceStop(id);
+    },
+    [changeMetaData, forceStop]
+  );
+
+  const offsetPylonTouchCount = useCallback(
+    async (id: string, offset: number) => {
+      await changeMetaData(id, meta => ({...meta, pylonTouchCount: meta.pylonTouchCount + offset}));
+    },
+    [changeMetaData]
+  );
+
+  const offsetDerailmentCount = useCallback(
+    async (id: string, offset: number) => {
+      await changeMetaData(id, meta => ({...meta, derailmentCount: meta.derailmentCount + offset}));
+    },
+    [changeMetaData]
+  );
+
+  return { forceStart, forceStop, dnf, offsetPylonTouchCount, offsetDerailmentCount, ...swr };
 };
