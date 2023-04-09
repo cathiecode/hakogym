@@ -3,6 +3,8 @@ import Page from "../ui/Page";
 import QueueControl from "../features/pending_car_queue/components/QueueControl";
 import RunningObserverControl from "../features/running_observer/components/RunningObserverControl";
 import CombinedTable from "../features/combined/components/CombinedTable";
+import LatestResultControl from "../features/combined/components/LatestResultControl";
+import Barrier from "../ui/Barrier";
 
 function MainColumn() {
   return <CombinedTable />;
@@ -11,21 +13,28 @@ function MainColumn() {
 export default function Home() {
   return (
     <Page>
-      <Container fluid>
-        <Row>
-          <Col lg={3} className="mb-3">
+      <div style={{ display: "flex", width: "100%", height: "100%" }}>
+        <div style={{ width: "20em", flexShrink: "0", margin: "0 1em", overflow: "auto" }}>
+          <Barrier>
+            <LatestResultControl />
+          </Barrier>
+          <Barrier>
             <RunningObserverControl />
+          </Barrier>
+          <Barrier>
             <Card>
               <Card.Body>
                 <QueueControl />
               </Card.Body>
             </Card>
-          </Col>
-          <Col>
+          </Barrier>
+        </div>
+        <div style={{ height: "100%", overflowX: "auto", overflowY: "scroll"}}>
+          <Barrier>
             <MainColumn />
-          </Col>
-        </Row>
-      </Container>
+          </Barrier>
+        </div>
+      </div>
     </Page>
   );
 }

@@ -1,6 +1,9 @@
 import { Alert, Nav } from "react-bootstrap";
 import Home from "./pages/Home";
 import { useState } from "react";
+import Sensor from "./pages/Sensor";
+import Debug from "./pages/Debug";
+import Barrier from "./ui/Barrier";
 
 export default function Router() {
   const [tab, setTab] = useState("home");
@@ -10,6 +13,12 @@ export default function Router() {
   switch (tab) {
     case "home":
       panel = <Home />;
+      break;
+    case "sensor":
+      panel = <Sensor />;
+      break;
+    case "debug":
+      panel = <Barrier><Debug /></Barrier>;
       break;
     default:
       panel = <Alert variant="danger">この機能はまだ実装されていません</Alert>;
@@ -28,7 +37,7 @@ export default function Router() {
           <Nav.Link eventKey="home">Home</Nav.Link>
         </Nav.Item>
         <Nav.Item>
-          <Nav.Link eventKey="signalio">光電管</Nav.Link>
+          <Nav.Link eventKey="sensor">光電管</Nav.Link>
         </Nav.Item>
         <Nav.Item>
           <Nav.Link eventKey="spreadsheet">スプレッドシート</Nav.Link>
@@ -38,6 +47,9 @@ export default function Router() {
         </Nav.Item>
         <Nav.Item>
           <Nav.Link eventKey="backup">バックアップ</Nav.Link>
+        </Nav.Item>
+        <Nav.Item>
+          <Nav.Link eventKey="debug">デバッグ</Nav.Link>
         </Nav.Item>
       </Nav>
       <div className="PageContainer">{panel}</div>

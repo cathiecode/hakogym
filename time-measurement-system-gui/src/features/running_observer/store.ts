@@ -6,6 +6,7 @@ import { RunningObserverClient } from "../../types/proto/running_observer.client
 import { useCallback } from "react";
 import { packMetaData, parseMetaData } from "../meta/types";
 import { ParsedMetaData } from "../meta/types";
+import toast from "react-hot-toast";
 
 const client = () =>
   new RunningObserverClient(
@@ -25,16 +26,27 @@ export const useRunnningObserverState = () => {
           .response.then((result) => next(null, result))
           .catch((e) => next(e));
 
-      connection.responses.onMessage(reload);
-
-      connection.responses.onError((e) => {
-        next(e);
-      });
-
       reload();
 
+      (async () => {
+        try {
+          for await (const _ of connection.responses) {
+            reload();
+          }
+
+          await connection;
+        } catch (e) {
+          if (abort.signal.aborted) {
+            return;
+          }
+          toast.error("RPC Disconnected: Running");
+          console.error("rpc", e);
+          next(e);
+        }
+      })();
+
       return () => {
-        abort.abort();
+        abort.abort("unsubscribe");
       };
     }
   );
@@ -91,7 +103,7 @@ export const useRunnningObserverState = () => {
 
   const dnf = useCallback(
     async (id: string) => {
-      await changeMetaData(id, metadata => ({...metadata, status: "DNF"}));
+      await changeMetaData(id, (metadata) => ({ ...metadata, status: "DNF" }));
       await forceStop(id);
     },
     [changeMetaData, forceStop]
@@ -99,17 +111,31 @@ export const useRunnningObserverState = () => {
 
   const offsetPylonTouchCount = useCallback(
     async (id: string, offset: number) => {
-      await changeMetaData(id, meta => ({...meta, pylonTouchCount: meta.pylonTouchCount + offset}));
+      await changeMetaData(id, (meta) => ({
+        ...meta,
+        pylonTouchCount: meta.pylonTouchCount + offset,
+      }));
     },
     [changeMetaData]
   );
 
   const offsetDerailmentCount = useCallback(
     async (id: string, offset: number) => {
-      await changeMetaData(id, meta => ({...meta, derailmentCount: meta.derailmentCount + offset}));
+      await changeMetaData(id, (meta) => ({
+        ...meta,
+        derailmentCount: meta.derailmentCount + offset,
+      }));
     },
     [changeMetaData]
   );
 
-  return { forceStart, forceStop, dnf, offsetPylonTouchCount, offsetDerailmentCount, updateMetadata, ...swr };
+  return {
+    forceStart,
+    forceStop,
+    dnf,
+    offsetPylonTouchCount,
+    offsetDerailmentCount,
+    updateMetadata,
+    ...swr,
+  };
 };

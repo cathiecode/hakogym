@@ -1,12 +1,15 @@
 import { GrpcWebFetchTransport } from "@protobuf-ts/grpcweb-transport";
 import { getPendingCarQueueAddress } from "../../api";
-import useSWRSubscription, {
-  SWRSubscriptionOptions,
-} from "swr/subscription";
+import useSWRSubscription, { SWRSubscriptionOptions } from "swr/subscription";
 
 import { PendingCarQueueClient } from "../../types/proto/pending_car_queue.client";
 import { useCallback } from "react";
-import { InsertedItem, Item, ReadAllReply } from "../../types/proto/pending_car_queue";
+import {
+  InsertedItem,
+  Item,
+  ReadAllReply,
+} from "../../types/proto/pending_car_queue";
+import toast from "react-hot-toast";
 
 const client = () =>
   new PendingCarQueueClient(
@@ -26,13 +29,24 @@ export const useList = () => {
           .response.then((result) => next(null, result))
           .catch((e) => next(e));
 
-      connection.responses.onMessage(reload);
-
-      connection.responses.onError((e) => {
-        next(e);
-      });
-
       reload();
+
+      (async () => {
+        try {
+          for await (const _ of connection.responses) {
+            reload();
+          }
+
+          await connection;
+        } catch (e) {
+          if (abort.signal.aborted) {
+            return;
+          }
+          toast.error("RPC Disconnected: Queue");
+          console.error("rpc", e);
+          next(e);
+        }
+      })();
 
       return () => {
         abort.abort();
@@ -70,6 +84,6 @@ export const useList = () => {
     insert,
     remove,
     update,
-    removeAll
+    removeAll,
   };
 };

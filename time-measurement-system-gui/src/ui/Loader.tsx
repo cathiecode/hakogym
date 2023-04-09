@@ -1,50 +1,56 @@
-import { ReactNode } from "react";
+import { ReactElement, ReactNode } from "react";
 import { Alert, Button, Spinner } from "react-bootstrap";
+import Loading from "./Loading";
 
 type LoaderProps<T, E> = {
-  isValidating?: boolean;
   data?: T;
   error?: E;
-  onReload?: () => void;
-  children: (data: NonNullable<T>) => ReactNode;
+  children: (data: T) => ReactElement | ReactElement[];
+  errorRender?: ReactElement | ((error: E) => ReactElement);
+  loadingRender?: ReactElement | (() => ReactElement);
 };
 
 export default function Loader<T, E>({
-  isValidating,
   data,
   error,
-  onReload,
   children,
+  loadingRender,
+  errorRender,
 }: LoaderProps<T, E>) {
   if (error) {
-    return (
-      <Alert variant="danger">
-        データのロードに失敗しました。(e: {error.toString()})
-        <Button onClick={onReload ?? (() => {location.reload()})}>再読み込み</Button>
-      </Alert>
-    );
+    if (errorRender) {
+      if (typeof errorRender === "function") {
+        return errorRender(error);
+      } else {
+        return errorRender;
+      }
+    } else {
+      return (
+        <Alert variant="danger">
+          データのロードに失敗しました。(e: {error.toString()})
+          <Button
+            onClick={() => {
+              location.reload();
+            }}
+          >
+            再読み込み
+          </Button>
+        </Alert>
+      );
+    }
   }
 
   if (data) {
-    return (
-      <div style={{ position: "relative" }}>
-        {children(data)}
-        <div style={{ position: "absolute", right: 0, top: 0 }}>
-          {isValidating ? (
-            <Spinner animation="border" role="status">
-              <span className="visually-hidden">読み込み中</span>
-            </Spinner>
-          ) : null}
-        </div>
-      </div>
-    );
-  } else {
-    return (
-      <div>
-        <Spinner animation="border" role="status">
-          <span className="visually-hidden">読み込み中</span>
-        </Spinner>
-      </div>
-    );
+    return <>{children(data)}</>;
   }
+
+  if (loadingRender) {
+    if (typeof loadingRender === "function") {
+      return loadingRender();
+    } else {
+      return loadingRender;
+    }
+  }
+
+  return <Loading />;
 }

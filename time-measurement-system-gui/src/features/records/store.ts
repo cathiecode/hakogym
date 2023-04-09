@@ -4,7 +4,9 @@ import { getRecordsAddress } from "../../api";
 import useSWRSubscription, { SWRSubscriptionOptions } from "swr/subscription";
 import { ReadAllReply } from "../../types/proto/records";
 import { useCallback } from "react";
-import { ParsedMetaData, packMetaData, parseMetaData } from "../meta/types";
+import { parseMetaData } from "../meta/types";
+import { RpcError } from "grpc-web";
+import toast from "react-hot-toast";
 
 const client = () =>
   new RecordsClient(
@@ -22,15 +24,26 @@ export default function useRecords() {
         client()
           .readAll({})
           .response.then((result) => next(null, result))
-          .catch((e) => next(e));
-
-      connection.responses.onMessage(reload);
-
-      connection.responses.onError((e) => {
-        next(e);
-      });
+          .catch((e) => next(e, undefined));
 
       reload();
+
+      (async () => {
+        try {
+          for await (const _ of connection.responses) {
+            reload();
+          }
+
+          await connection;
+        } catch (e) {
+          if (abort.signal.aborted) {
+            return;
+          }
+          toast.error("RPC Disconnected: Records");
+          console.error("rpc", e);
+          next(e);
+        }
+      })();
 
       return () => {
         abort.abort();
@@ -70,5 +83,5 @@ export default function useRecords() {
     return metaData;
   }, []);
 
-  return {updateMetadata, ...swr};
+  return { updateMetadata, ...swr };
 }

@@ -2,7 +2,7 @@
   box-sizing: border-box;
   position: sticky;
   top: 0;
-  background-color: #fff;
+  background-color: #fff
 }
 
 .tabl th, .table td {
@@ -10,7 +10,7 @@
 }
 
 .highlighted {
-  background-color: #9cf;
-  position: sticky;
-  bottom: 0;
+  background-color: var(--bs-info);
+  /*position: sticky;
+  bottom: 0;*/
 }

@@ -1,8 +1,8 @@
 import { Button, Card, Col, Form, InputGroup, Row } from "react-bootstrap";
 import Timer from "../../../ui/Timer";
 import { Item } from "../../../types/proto/running_observer";
-import { ParsedMetaData, parseMetaData } from "../../meta/types";
-import { useEffect, useMemo, useState } from "react";
+import { parseMetaData } from "../../meta/types";
+import { useMemo } from "react";
 import { formatDuration } from "../../../utils/formatDuration";
 import Confirm from "../../../ui/Confirm";
 import { useRunnningObserverState } from "../store";
@@ -33,7 +33,7 @@ export default function RunningObserverRunningCarControl({
   return (
     <Card className="mb-3">
       <Card.Header>
-        {item ? metaData?.carId || "(ゼッケンなし)" : "待機中"}
+        走行中: {item ? `${metaData?.carId ?? "(ゼッケンなし)"}` : "なし"}
       </Card.Header>
       <Card.Body>
         <div className="mb-3">

@@ -1,18 +1,23 @@
-import { useState } from "react";
-import { useInterval } from "usehooks-ts";
+import { useCallback, useRef } from "react";
 import { formatDuration } from "../utils/formatDuration";
+import useAnimationFrame from "../hooks/useAnimationFrame";
 
 type TimerProps = {
   startTimeStamp: number;
 };
 
 export default function Timer({ startTimeStamp }: TimerProps) {
-    const [duration, setDuration] = useState<number>(() => Date.now() - startTimeStamp);
+  const wrapperRef = useRef<HTMLSpanElement>(null);
 
-    useInterval(() => {
-        setDuration(Date.now() - startTimeStamp);
-    }, 91);
+  const onAnimationFrame = useCallback(() => {
+    if (wrapperRef.current) {
+      wrapperRef.current.textContent = formatDuration(
+        Date.now() - startTimeStamp
+      );
+    }
+  }, [startTimeStamp]);
 
+  useAnimationFrame(onAnimationFrame);
 
-  return <div>{formatDuration(duration)}</div>
+  return <span ref={wrapperRef}>{formatDuration(0)}</span>;
 }
