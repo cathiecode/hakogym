@@ -3,7 +3,7 @@ use anyhow::bail;
 use anyhow::Result;
 use async_trait::async_trait;
 use jsonschema::JSONSchema;
-use log::{debug, error, trace};
+use log::{debug, error};
 use nanoid::nanoid;
 
 use crate::prelude::*;

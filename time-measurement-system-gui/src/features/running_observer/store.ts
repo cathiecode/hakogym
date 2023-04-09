@@ -111,5 +111,5 @@ export const useRunnningObserverState = () => {
     [changeMetaData]
   );
 
-  return { forceStart, forceStop, dnf, offsetPylonTouchCount, offsetDerailmentCount, ...swr };
+  return { forceStart, forceStop, dnf, offsetPylonTouchCount, offsetDerailmentCount, updateMetadata, ...swr };
 };

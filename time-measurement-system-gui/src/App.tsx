@@ -9,7 +9,7 @@ function App() {
   return (
     <Barrier>
       <Router />
-      <Toaster position="bottom-right" />
+      <Toaster position="top-right" />
     </Barrier>
   );
 }

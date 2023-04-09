@@ -1,19 +1,15 @@
-import { ReactElement, useCallback, useMemo } from "react";
+import { ReactElement, useMemo } from "react";
 import { ParsedMetaData, packMetaData, parseMetaData } from "../../types";
 import { ErrorBoundary } from "react-error-boundary";
-import EditableValue from "../../../../ui/EditableCell";
+import EditableValue from "../../../../ui/EditableValue";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faCircleInfo,
   faTriangleExclamation,
 } from "@fortawesome/free-solid-svg-icons";
 
-import styles from "./styles.module.css";
-
-import classNames from "classnames/bind";
 import { Alert } from "react-bootstrap";
-
-const cx = classNames.bind(styles);
+import JointMetaCell from "../JointMetaCell";
 
 function Error(props: { children: ReactElement | string }) {
   return (
@@ -50,28 +46,72 @@ function MetaCellsInner(props: MetaCellsProps) {
       <EditableValue
         value={value.carId}
         onChange={(newValue) => change({ ...value, carId: newValue })}
+        readonly={!props.onChange}
       >
-        {(props) => <td {...props} />}
+        {({ children, ...props }) => (
+          <td {...props}>
+            {children === "" ? (
+              <span style={{ color: "#aaa" }}>(ゼッケンなし)</span>
+            ) : (
+              children
+            )}
+          </td>
+        )}
       </EditableValue>
       <EditableValue
         value={value.pylonTouchCount.toString(10)}
-        onChange={(newValue) => change({...value, pylonTouchCount: Number(newValue)})}
+        onChange={(newValue) =>
+          change({ ...value, pylonTouchCount: Number(newValue) })
+        }
         validate={(value) =>
           !isNaN(Number(value)) || <Error>数値を入力してください</Error>
         }
+        readonly={!props.onChange}
       >
         {(props) => <td {...props} />}
       </EditableValue>
       <EditableValue
         value={value.derailmentCount.toString(10)}
-        onChange={(newValue) => change({...value, derailmentCount: Number(newValue)})}
+        onChange={(newValue) =>
+          change({ ...value, derailmentCount: Number(newValue) })
+        }
         validate={(value) =>
           !isNaN(Number(value)) || <Error>数値を入力してください</Error>
         }
+        readonly={!props.onChange}
       >
         {(props) => <td {...props} />}
       </EditableValue>
-      <td>{value.status || "--"}</td>
+      <EditableValue
+        value={value.status ?? ""}
+        onChange={(newValue) =>
+          change({
+            ...value,
+            status: (newValue as "" | "MC" | "DNF" | "DNS") || undefined,
+          })
+        }
+        validate={(value) =>
+          ["", "MC", "DNF", "DNS"].includes(value) ||
+          "値はMC、DNF、DNSのいずれかあるいは空である必要があります"
+        }
+        customInput={({ ref, onExit, ...props }) => (
+          <select
+            ref={ref}
+            {...props}
+            onChange={(ev) => {
+              onExit(ev.currentTarget.value);
+            }}
+          >
+            <option value="">記録</option>
+            <option value="MC">MC</option>
+            <option value="DNF">DNF</option>
+            <option value="DNS">DNS</option>
+          </select>
+        )}
+        readonly={!props.onChange}
+      >
+        {(props) => <td {...props} />}
+      </EditableValue>
     </>
   );
 }
@@ -79,7 +119,7 @@ function MetaCellsInner(props: MetaCellsProps) {
 function MetaCellsFallback() {
   return (
     <>
-      <td>Metadata Error</td>
+      <JointMetaCell>Metadata Error</JointMetaCell>
     </>
   );
 }

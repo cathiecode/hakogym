@@ -3,6 +3,8 @@ import { RecordsClient } from "../../types/proto/records.client";
 import { getRecordsAddress } from "../../api";
 import useSWRSubscription, { SWRSubscriptionOptions } from "swr/subscription";
 import { ReadAllReply } from "../../types/proto/records";
+import { useCallback } from "react";
+import { ParsedMetaData, packMetaData, parseMetaData } from "../meta/types";
 
 const client = () =>
   new RecordsClient(
@@ -36,5 +38,37 @@ export default function useRecords() {
     }
   );
 
-  return swr;
+  const updateMetadata = useCallback(async (id: string, meta: string) => {
+    const oldItem = (await client().readAll({}).response).item.find(
+      (item) => item.id === id
+    );
+
+    if (!oldItem) {
+      throw new Error(`Failed to read old item ${id}`);
+    }
+
+    await client().update({
+      item: {
+        id,
+        meta,
+        time: oldItem.time,
+      },
+    });
+  }, []);
+
+  const getMetaData = useCallback(async (id: string) => {
+    const item = (await client().readAll({})).response.item.find(
+      (item) => item.id === id
+    );
+
+    if (!item) {
+      throw "アイテムが見つかりませんでした";
+    }
+
+    const metaData = parseMetaData(item.meta);
+
+    return metaData;
+  }, []);
+
+  return {updateMetadata, ...swr};
 }

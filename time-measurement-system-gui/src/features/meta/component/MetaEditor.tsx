@@ -118,8 +118,6 @@ export default function MetaEditor({
     }
   }, [carId, pylonTouchCount, derailmentCount, onChange, parsedInputData]);
 
-  console.log("rerender");
-
   return (
     <>
       <Form.Group className="mb-3">

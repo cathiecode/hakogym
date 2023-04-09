@@ -2,7 +2,7 @@ import { Card, Col, Container, Row, Table } from "react-bootstrap";
 import Page from "../ui/Page";
 import QueueControl from "../features/pending_car_queue/components/QueueControl";
 import RunningObserverControl from "../features/running_observer/components/RunningObserverControl";
-import CombinedTable from "../features/combined_table/components/CombinedTable";
+import CombinedTable from "../features/combined/components/CombinedTable";
 
 function MainColumn() {
   return <CombinedTable />;

@@ -54,7 +54,7 @@ export const useList = () => {
     await client().update({
       item,
     }).response;
-  }, [])
+  }, []);
 
   const remove = useCallback(async (id: string) => {
     await client().remove({ id }).response;

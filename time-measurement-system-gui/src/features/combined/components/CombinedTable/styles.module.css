@@ -1,16 +1,16 @@
-.table thead th {
+.table thead {
   box-sizing: border-box;
   position: sticky;
   top: 0;
   background-color: #fff;
 }
 
-.tbody--running {
-  position: sticky;
-  bottom: 0;
-  background-color: #fff;
+.tabl th, .table td {
+  vertical-align: middle;
 }
 
-.row--highlighted {
+.highlighted {
   background-color: #9cf;
+  position: sticky;
+  bottom: 0;
 }

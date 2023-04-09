@@ -1,15 +1,8 @@
-import {
-  Button,
-  Card,
-  Col,
-  Form,
-  InputGroup,
-  Row,
-} from "react-bootstrap";
+import { Button, Card, Col, Form, InputGroup, Row } from "react-bootstrap";
 import Timer from "../../../ui/Timer";
 import { Item } from "../../../types/proto/running_observer";
-import { parseMetaData } from "../../meta/types";
-import { useMemo } from "react";
+import { ParsedMetaData, parseMetaData } from "../../meta/types";
+import { useEffect, useMemo, useState } from "react";
 import { formatDuration } from "../../../utils/formatDuration";
 import Confirm from "../../../ui/Confirm";
 import { useRunnningObserverState } from "../store";
@@ -21,7 +14,8 @@ type RunningObserverRunningCarControlProps = {
 export default function RunningObserverRunningCarControl({
   item,
 }: RunningObserverRunningCarControlProps) {
-  const {forceStop, dnf, offsetPylonTouchCount, offsetDerailmentCount} = useRunnningObserverState();
+  const { forceStop, dnf, offsetPylonTouchCount, offsetDerailmentCount } =
+    useRunnningObserverState();
 
   const metaData = useMemo(() => {
     if (!item) {
@@ -51,16 +45,26 @@ export default function RunningObserverRunningCarControl({
         </div>
         <div>
           <Form.Group as={Row} className="mb-2">
-            <Form.Label column sm={4}>パイロン</Form.Label>
+            <Form.Label column sm={4}>
+              パイロン
+            </Form.Label>
             <Col>
               <InputGroup>
-                <Button variant="warning" onClick={() => item?.id && offsetPylonTouchCount(item.id, -1)} disabled={!isControlActive}>
+                <Button
+                  variant="warning"
+                  onClick={() => item?.id && offsetPylonTouchCount(item.id, -1)}
+                  disabled={!isControlActive}
+                >
                   -
                 </Button>
                 <InputGroup.Text>
                   {metaData?.pylonTouchCount ?? 0}
                 </InputGroup.Text>
-                <Button variant="warning" onClick={() => item?.id && offsetPylonTouchCount(item.id, 1)} disabled={!isControlActive}>
+                <Button
+                  variant="warning"
+                  onClick={() => item?.id && offsetPylonTouchCount(item.id, 1)}
+                  disabled={!isControlActive}
+                >
                   +
                 </Button>
               </InputGroup>
@@ -68,29 +72,59 @@ export default function RunningObserverRunningCarControl({
           </Form.Group>
 
           <Form.Group as={Row} className="mb-3">
-            <Form.Label column sm={4}>脱輪</Form.Label>
+            <Form.Label column sm={4}>
+              脱輪
+            </Form.Label>
             <Col>
               <InputGroup>
-                <Button variant="secondary" onClick={() => item?.id && offsetDerailmentCount(item.id, -1)} disabled={!isControlActive}>
+                <Button
+                  variant="secondary"
+                  onClick={() => item?.id && offsetDerailmentCount(item.id, -1)}
+                  disabled={!isControlActive}
+                >
                   -
                 </Button>
                 <InputGroup.Text>
                   {metaData?.derailmentCount ?? 0}
                 </InputGroup.Text>
-                <Button variant="secondary" onClick={() => item?.id && offsetDerailmentCount(item.id, 1)} disabled={!isControlActive}>
+                <Button
+                  variant="secondary"
+                  onClick={() => item?.id && offsetDerailmentCount(item.id, 1)}
+                  disabled={!isControlActive}
+                >
                   +
                 </Button>
               </InputGroup>
             </Col>
           </Form.Group>
 
-          <Button variant="warning" className="m-1" onClick={() => forceStop()} disabled={!isControlActive}>
-            手動ストップ
-          </Button>
-
-          <Confirm message="DNFとして記録しますか？" onConfirmed={() => item?.id && dnf(item.id)}>
+          <Confirm
+            message="MCとして記録しますか？"
+            onConfirmed={() => item?.id && dnf(item.id)}
+          >
             {(props) => (
-              <Button variant="danger" className="m-1" {...props} disabled={!isControlActive}>
+              <Button
+                variant="secondary"
+                className="m-1"
+                {...props}
+                disabled={!isControlActive}
+              >
+                MC
+              </Button>
+            )}
+          </Confirm>
+
+          <Confirm
+            message="DNFとして記録しますか？"
+            onConfirmed={() => item?.id && dnf(item.id)}
+          >
+            {(props) => (
+              <Button
+                variant="danger"
+                className="m-1"
+                {...props}
+                disabled={!isControlActive}
+              >
                 DNF
               </Button>
             )}

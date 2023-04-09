@@ -16,8 +16,8 @@ export default function Confirm(props: ConfirmProps) {
   return (
     <>
       <Overlay target={target.current} show={show} placement="right">
-        {(options) => (
-          <Popover {...options}>
+        {({ref, ...options}) => (
+          <Popover ref={ref} {...options}>
             <Popover.Header>確認</Popover.Header>
             <Popover.Body>
               <p>{props.message}</p>

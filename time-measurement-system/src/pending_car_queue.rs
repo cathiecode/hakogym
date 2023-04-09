@@ -1,6 +1,6 @@
 use anyhow::{anyhow, bail, Result};
 use async_trait::async_trait;
-use jsonschema::JSONSchema;
+use jsonschema::{JSONSchema, ValidationError};
 use log::{error, trace};
 use nanoid::nanoid;
 
@@ -16,19 +16,34 @@ struct PendingCar {
 pub struct PendingCarQueue {
     queue: Vec<PendingCar>,
     meta_schema: JSONSchema,
+    default_meta_data: String,
     on_change: tokio::sync::watch::Sender<Vec<PendingCar>>,
     watcher: tokio::sync::watch::Receiver<Vec<PendingCar>>,
 }
 
 impl PendingCarQueue {
     pub fn new(config: &Config) -> Self {
-        let queue = Vec::new();
+        let queue = vec![PendingCar {
+            id: nanoid!(),
+            meta: config.record.metadata.default.to_string(),
+        }];
         let (on_change, watcher) = tokio::sync::watch::channel(queue.clone());
+        let meta_schema = JSONSchema::compile(&config.record.metadata.schema)
+            .unwrap_or_else(|e| panic!("Invalid metadata schema! {:?}", e));
+
+        meta_schema
+            .validate(&config.record.metadata.default)
+            .unwrap_or_else(|e| {
+                panic!(
+                    "Invalid default metadata! ({:?})",
+                    e.collect::<Vec<ValidationError>>()
+                )
+            });
 
         PendingCarQueue {
             queue,
-            meta_schema: JSONSchema::compile(&config.record.metadata.schema)
-                .unwrap_or_else(|e| panic!("Invalid metadata schema! {:?}", e)),
+            meta_schema,
+            default_meta_data: config.record.metadata.default.to_string(),
             on_change,
             watcher,
         }
@@ -62,6 +77,12 @@ impl PendingCarQueue {
         trace!("Removing");
         let index = self.find_car_index(id)?;
         self.queue.remove(index);
+
+        if self.queue.len() == 0 {
+            self.insert(self.default_meta_data.clone(), None)
+                .map_err(|e| anyhow!("Logic Error {}", e))?;
+        }
+
         self.promote_change();
         Ok(())
     }
@@ -121,10 +142,18 @@ impl PendingCarQueue {
         Ok(())
     }
 
-    pub fn remove_all(&mut self) {
+    pub fn remove_all(&mut self) -> Result<()> {
         trace!("Remove all");
         self.queue.clear();
-        self.promote_change();
+
+        if self.queue.len() == 0 {
+            self.insert(self.default_meta_data.clone(), None)
+                .map_err(|e| anyhow!("Logic Error {}", e))?;
+        }
+
+        // NOTE: promote_changeはinsertで行われているので省略
+
+        Ok(())
     }
 
     pub fn replace(&mut self, metas: impl Iterator<Item = String>) -> Result<()> {
@@ -142,6 +171,11 @@ impl PendingCarQueue {
             .all(|record| self.validate_record(record).is_ok())
         {
             bail!("Request includes invalid record!");
+        }
+
+        if self.queue.len() == 0 {
+            self.insert(self.default_meta_data.clone(), None)
+                .map_err(|e| anyhow!("Logic Error {}", e))?;
         }
 
         self.queue = new_records;
@@ -181,8 +215,16 @@ impl crate::running_observer::NextCarQueue for PendingCarQueue {
             return None;
         }
 
+        let consumed_meta = self.queue.remove(0).meta;
+
+        if self.queue.len() == 0 {
+            self.insert(self.default_meta_data.clone(), None)
+                .unwrap_or_else(|e| error!("Logic Error {}", e));
+        }
+
         self.promote_change();
-        Some(self.queue.remove(0).meta)
+
+        Some(consumed_meta)
     }
 }
 
@@ -273,7 +315,10 @@ pub mod server {
             &self,
             _request: Request<proto::RemoveAllRequest>,
         ) -> Result<tonic::Response<proto::CommandReply>, Status> {
-            self.lock().await.remove_all();
+            self.lock()
+                .await
+                .remove_all()
+                .map_err(|e| Status::failed_precondition(e.to_string()))?;
 
             Ok(tonic::Response::new(proto::CommandReply {}))
         }
