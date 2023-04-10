@@ -8,7 +8,7 @@ use crate::{config::Config, prelude::*};
 
 // TODO: validate metadata
 #[derive(Clone, Debug)]
-struct PendingCar {
+pub struct PendingCar {
     id: String,
     meta: MetaData,
 }
@@ -183,6 +183,10 @@ impl PendingCarQueue {
         Ok(())
     }
 
+    pub fn watcher(&self) -> &tokio::sync::watch::Receiver<Vec<PendingCar>> {
+        &self.watcher
+    }
+
     fn find_car_index(&mut self, car_id: &str) -> Result<usize> {
         if let Some(index) = self.queue.iter().position(|car| &car.id == car_id) {
             Ok(index)
@@ -206,6 +210,7 @@ impl PendingCarQueue {
             .map_err(|_| anyhow!("Metadata validation failed."))?;
         Ok(())
     }
+
 }
 
 #[async_trait]

@@ -11,6 +11,7 @@ spawnSync(
     "../proto/pending_car_queue.proto",
     "../proto/running_observer.proto",
     "../proto/records.proto",
+    "../proto/aggrigated_change_broadcaster.proto",
   ],
   { stdio: "inherit", shell: true }
 );

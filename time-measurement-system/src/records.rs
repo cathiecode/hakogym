@@ -11,7 +11,7 @@ use crate::running_observer;
 use crate::Config;
 
 #[derive(Clone, Debug)]
-struct Record {
+pub struct Record {
     pub record_id: String,
     pub duration: Duration,
     pub meta: String,
@@ -88,6 +88,10 @@ impl Records {
 
         self.promote_change();
         Ok(())
+    }
+
+    pub fn watcher(&self) -> &tokio::sync::watch::Receiver<Vec<Record>> {
+        &self.watcher
     }
 
     fn promote_change(&self) {

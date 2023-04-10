@@ -14,7 +14,7 @@ type RunningObserverRunningCarControlProps = {
 export default function RunningObserverRunningCarControl({
   item,
 }: RunningObserverRunningCarControlProps) {
-  const { forceStop, dnf, offsetPylonTouchCount, offsetDerailmentCount } =
+  const { dnf, offsetPylonTouchCount, offsetDerailmentCount } =
     useRunnningObserverState();
 
   const metaData = useMemo(() => {
@@ -33,7 +33,7 @@ export default function RunningObserverRunningCarControl({
   return (
     <Card className="mb-3">
       <Card.Header>
-        走行中: {item ? `${metaData?.carId ?? "(ゼッケンなし)"}` : "なし"}
+        走行中: {item ? `${metaData?.carId || "(ゼッケンなし)"}` : "なし"}
       </Card.Header>
       <Card.Body>
         <div className="mb-3">

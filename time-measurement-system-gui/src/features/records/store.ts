@@ -1,6 +1,6 @@
 import { GrpcWebFetchTransport } from "@protobuf-ts/grpcweb-transport";
 import { RecordsClient } from "../../types/proto/records.client";
-import { getRecordsAddress } from "../../api";
+import { getRecordsAddress, pooledSubscribeAggrigatedChange } from "../../api";
 import useSWRSubscription, { SWRSubscriptionOptions } from "swr/subscription";
 import { ReadAllReply } from "../../types/proto/records";
 import { useCallback } from "react";
@@ -17,9 +17,6 @@ export default function useRecords() {
   const swr = useSWRSubscription(
     ["records", "useList"],
     (_, { next }: SWRSubscriptionOptions<ReadAllReply, unknown>) => {
-      const abort = new AbortController();
-      const connection = client().subscribeChange({}, { abort: abort.signal });
-
       const reload = () =>
         client()
           .readAll({})
@@ -28,25 +25,21 @@ export default function useRecords() {
 
       reload();
 
-      (async () => {
-        try {
-          for await (const _ of connection.responses) {
-            reload();
-          }
-
-          await connection;
-        } catch (e) {
-          if (abort.signal.aborted) {
-            return;
-          }
+      const unsubscribe = pooledSubscribeAggrigatedChange(
+        () => {
+          reload();
+        },
+        (e) => {
           toast.error("RPC Disconnected: Records");
           console.error("rpc", e);
           next(e);
         }
-      })();
+      );
+
+      reload();
 
       return () => {
-        abort.abort();
+        unsubscribe();
       };
     }
   );

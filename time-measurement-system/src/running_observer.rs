@@ -9,7 +9,7 @@ use tokio::sync::Mutex;
 use crate::{prelude::*, Config};
 
 #[derive(Clone, Debug)]
-struct RunningCar {
+pub struct RunningCar {
     car_id: RunningCarId,
     start_at: TimeStamp,
     meta: String,
@@ -163,6 +163,10 @@ impl RunningObserver {
 
         self.promote_change();
         Ok(())
+    }
+
+    pub fn watcher(&self) -> &tokio::sync::watch::Receiver<Vec<RunningCar>> {
+        &self.watcher
     }
 
     fn find_car_index(&mut self, car_id: &RunningCarId) -> Result<usize> {

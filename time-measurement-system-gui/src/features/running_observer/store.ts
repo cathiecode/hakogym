@@ -1,5 +1,8 @@
 import { GrpcWebFetchTransport } from "@protobuf-ts/grpcweb-transport";
-import { getPendingCarQueueAddress } from "../../api";
+import {
+  getPendingCarQueueAddress,
+  pooledSubscribeAggrigatedChange,
+} from "../../api";
 import useSWRSubscription, { SWRSubscriptionOptions } from "swr/subscription";
 import { ReadAllReply } from "../../types/proto/running_observer";
 import { RunningObserverClient } from "../../types/proto/running_observer.client";
@@ -17,36 +20,27 @@ export const useRunnningObserverState = () => {
   const swr = useSWRSubscription(
     ["running_observer", "useList"],
     (_, { next }: SWRSubscriptionOptions<ReadAllReply, unknown>) => {
-      const abort = new AbortController();
-      const connection = client().subscribeChange({}, { abort: abort.signal });
-
       const reload = () =>
         client()
           .readAll({})
           .response.then((result) => next(null, result))
           .catch((e) => next(e));
 
-      reload();
-
-      (async () => {
-        try {
-          for await (const _ of connection.responses) {
-            reload();
-          }
-
-          await connection;
-        } catch (e) {
-          if (abort.signal.aborted) {
-            return;
-          }
+      const unsubscribe = pooledSubscribeAggrigatedChange(
+        () => {
+          reload();
+        },
+        (e) => {
           toast.error("RPC Disconnected: Running");
           console.error("rpc", e);
           next(e);
         }
-      })();
+      );
+
+      reload();
 
       return () => {
-        abort.abort("unsubscribe");
+        unsubscribe();
       };
     }
   );
