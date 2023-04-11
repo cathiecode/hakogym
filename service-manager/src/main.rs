@@ -41,6 +41,7 @@ struct Service {
     last_args: Vec<String>,
     kill: Arc<Mutex<Option<oneshot::Sender<()>>>>,
     on_change: Option<Sender<ServiceEvent>>,
+    allow_args_override: bool
 }
 
 impl Service {
@@ -48,6 +49,7 @@ impl Service {
         service_id: &str,
         program: &str,
         default_args: Vec<String>,
+        allow_args_override: bool,
         default_start: bool,
         on_change: Option<Sender<ServiceEvent>>,
     ) -> Result<Self> {
@@ -56,6 +58,7 @@ impl Service {
             program: program.to_string(),
             last_args: default_args.clone(),
             default_args,
+            allow_args_override,
             kill: Arc::new(Mutex::new(None)),
             on_change,
         };
@@ -69,6 +72,10 @@ impl Service {
 
     async fn start(&mut self, override_args: Option<Vec<String>>) -> Result<()> {
         debug!("Starting {}", self.id);
+
+        if !self.allow_args_override && override_args.is_some() {
+            bail!("Override args was disallowed.");
+        }
 
         if self.running().await {
             if let Err(e) = self.stop().await {
@@ -169,6 +176,7 @@ impl ServiceManager {
         id: &str,
         program: &str,
         arg: Vec<String>,
+        allow_args_override: bool,
         default_start: bool,
     ) -> Result<()> {
         if self.service.contains_key(id) {
@@ -179,7 +187,7 @@ impl ServiceManager {
 
         self.service.insert(
             id.to_string(),
-            Service::new(&id, program, arg, default_start, None)
+            Service::new(&id, program, arg, allow_args_override, default_start, None)
                 .await
                 .unwrap(),
         );
@@ -278,6 +286,7 @@ struct ServiceConfig {
     program: String,
     default_args: Vec<String>,
     default_start: Option<bool>,
+    allow_args_override: Option<bool>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -319,6 +328,7 @@ async fn main() {
                 &id,
                 &service_config.program,
                 service_config.default_args.clone(),
+                service_config.allow_args_override.unwrap_or(false),
                 service_config.default_start.unwrap_or(false),
             )
             .await
@@ -349,7 +359,7 @@ mod test {
 
     #[tokio::test]
     async fn running() {
-        let mut service = Service::new("", sleep_command(), vec!["3".to_string()], true, None)
+        let mut service = Service::new("", sleep_command(), vec!["3".to_string()], false, true, None)
             .await
             .unwrap();
 
@@ -360,7 +370,7 @@ mod test {
 
     #[tokio::test]
     async fn non_default_start() {
-        let mut service = Service::new("", sleep_command(), vec!["3".to_string()], false, None)
+        let mut service = Service::new("", sleep_command(), vec!["3".to_string()], true, false, None)
             .await
             .unwrap();
 
@@ -373,7 +383,7 @@ mod test {
 
     #[tokio::test]
     async fn stop() {
-        let mut service = Service::new("", sleep_command(), vec!["3".to_string()], true, None)
+        let mut service = Service::new("", sleep_command(), vec!["3".to_string()], false, true, None)
             .await
             .unwrap();
 
@@ -384,7 +394,7 @@ mod test {
 
     #[tokio::test]
     async fn start_with_override() {
-        let mut service = Service::new("", sleep_command(), vec!["10".to_string()], false, None)
+        let mut service = Service::new("", sleep_command(), vec!["10".to_string()], true, false, None)
             .await
             .unwrap();
 

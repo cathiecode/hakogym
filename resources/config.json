@@ -3,7 +3,8 @@
     "sleep": {
       "program": "timeout",
       "default_args": ["5"],
-      "default_start": false
+      "default_start": false,
+      "allow_args_overrride": true
     }
   },
   "record": {
