@@ -1,5 +1,23 @@
 {
   "services": {
+    "main": {
+      "program": "time-measurement-system.exe",
+      "default_args": ["--config", "config.json"],
+      "default_start": true,
+      "allow_args_overrride": true
+    },
+    "gui": {
+      "program": "time-measurement-system-gui.exe",
+      "default_args": [],
+      "default_start": true,
+      "allow_args_overrride": true
+    },
+    "sensor": {
+      "program": "time-measurement-system-sensor-io.exe",
+      "default_args": ["--config", "config.json", "--com", "COM3", "--baud", "9600"],
+      "default_start": false,
+      "allow_args_overrride": true
+    },
     "sleep": {
       "program": "timeout",
       "default_args": ["5"],
