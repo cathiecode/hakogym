@@ -5,6 +5,7 @@ import { GrpcWebFetchTransport } from "@protobuf-ts/grpcweb-transport";
 import { getPendingCarQueueAddress } from "../api";
 import { toast } from "react-hot-toast";
 import { atom, useAtom } from "jotai";
+import ServiceStatusDebug from "../features/service_manager/components/ServiceStatusDebug";
 
 const debugAtom = atom(false);
 const abortsAtom = atom<AbortController[]>([]);
@@ -87,6 +88,7 @@ export default function DebugRoom() {
           </Button>
         </p>
         <SubscriptionBomb />
+        <ServiceStatusDebug />
       </Container>
     </Page>
   );

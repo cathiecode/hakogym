@@ -4,6 +4,7 @@ import { useState } from "react";
 import Sensor from "./pages/Sensor";
 import Debug from "./pages/Debug";
 import Barrier from "./ui/Barrier";
+import ServiceStatusIcon from "./features/service_manager/components/ServiceStatusIcon";
 
 export default function Router() {
   const [tab, setTab] = useState("home");
@@ -34,10 +35,16 @@ export default function Router() {
         onSelect={(key) => key && setTab(key)}
       >
         <Nav.Item>
-          <Nav.Link eventKey="home">Home</Nav.Link>
+          <Nav.Link eventKey="home">
+            <ServiceStatusIcon service="main" />
+            Home
+          </Nav.Link>
         </Nav.Item>
         <Nav.Item>
-          <Nav.Link eventKey="sensor">光電管</Nav.Link>
+          <Nav.Link eventKey="sensor">
+          <ServiceStatusIcon service="sensor" />
+            光電管
+          </Nav.Link>
         </Nav.Item>
         <Nav.Item>
           <Nav.Link eventKey="spreadsheet">スプレッドシート</Nav.Link>

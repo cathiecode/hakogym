@@ -15,7 +15,7 @@ function buildWithCargo(project) {
     stdio: "inherit",
   });
 
-  if (result.error) {
+  if (result.status !== 0) {
     throw new Error(result.error);
   }
 
@@ -32,7 +32,7 @@ function buildWithTauriNpm(project, name) {
     shell: true,
   });
 
-  if (result.error) {
+  if (result.status !== 0) {
     throw new Error(result.error);
   }
 

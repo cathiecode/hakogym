@@ -1,6 +1,8 @@
 import { GrpcWebFetchTransport } from "@protobuf-ts/grpcweb-transport";
 import { AggrigatedChangeBroadcasterClient } from "./types/proto/aggrigated_change_broadcaster.client";
 
+// FIXME: Configuration support
+
 export function getPendingCarQueueAddress() {
   return "http://localhost:11000";
 }
@@ -15,6 +17,10 @@ export function getRecordsAddress() {
 
 export function getAggrigatedChangeBroadcasterAddress() {
   return "http://localhost:11000";
+}
+
+export function getServiceManagerAddress() {
+  return "http://localhost:11001";
 }
 
 type UnSubscribe = () => void;

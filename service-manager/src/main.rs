@@ -9,7 +9,7 @@ use clap::{command, Parser};
 use serde::Deserialize;
 use tokio::{
     fs::read_to_string,
-    process,
+    process, signal,
     sync::{oneshot, Mutex},
 };
 
@@ -41,7 +41,7 @@ struct Service {
     last_args: Vec<String>,
     kill: Arc<Mutex<Option<oneshot::Sender<()>>>>,
     on_change: Option<Sender<ServiceEvent>>,
-    allow_args_override: bool
+    allow_args_override: bool,
 }
 
 impl Service {
@@ -320,10 +320,12 @@ async fn main() {
     let config = serde_json::from_str::<Config>(&config_string)
         .unwrap_or_else(|error| panic!("Invalid config data! {:?}", error));
 
-    let mut service = ServiceManager::new();
+    let mut service = Arc::new(Mutex::new(ServiceManager::new()));
 
     for (id, service_config) in config.services.iter() {
         service
+            .lock()
+            .await
             .add(
                 &id,
                 &service_config.program,
@@ -338,11 +340,21 @@ async fn main() {
     tonic::transport::Server::builder()
         .accept_http1(true)
         .add_service(tonic_web::enable(
-            proto::service_manager_server::ServiceManagerServer::new(Arc::new(Mutex::new(service))),
+            proto::service_manager_server::ServiceManagerServer::new(service.clone()),
         ))
         .serve(config.server.service_manager_addr.parse().unwrap())
         .await
         .unwrap();
+
+    signal::ctrl_c().await.unwrap();
+
+    let mut service = service.lock().await;
+
+    for (id, service) in service.service.iter_mut() {
+        if let Err(e) = service.stop().await {
+            warn!("Failed to terminate service {} due to {:?}", id, e);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -359,9 +371,16 @@ mod test {
 
     #[tokio::test]
     async fn running() {
-        let mut service = Service::new("", sleep_command(), vec!["3".to_string()], false, true, None)
-            .await
-            .unwrap();
+        let mut service = Service::new(
+            "",
+            sleep_command(),
+            vec!["3".to_string()],
+            false,
+            true,
+            None,
+        )
+        .await
+        .unwrap();
 
         assert_eq!(service.running().await, true);
         tokio::time::sleep(std::time::Duration::from_millis(5000)).await;
@@ -370,9 +389,16 @@ mod test {
 
     #[tokio::test]
     async fn non_default_start() {
-        let mut service = Service::new("", sleep_command(), vec!["3".to_string()], true, false, None)
-            .await
-            .unwrap();
+        let mut service = Service::new(
+            "",
+            sleep_command(),
+            vec!["3".to_string()],
+            true,
+            false,
+            None,
+        )
+        .await
+        .unwrap();
 
         assert_eq!(service.running().await, false);
         service.start(None).await.unwrap();
@@ -383,9 +409,16 @@ mod test {
 
     #[tokio::test]
     async fn stop() {
-        let mut service = Service::new("", sleep_command(), vec!["3".to_string()], false, true, None)
-            .await
-            .unwrap();
+        let mut service = Service::new(
+            "",
+            sleep_command(),
+            vec!["3".to_string()],
+            false,
+            true,
+            None,
+        )
+        .await
+        .unwrap();
 
         assert_eq!(service.running().await, true);
         service.stop().await.unwrap();
@@ -394,9 +427,16 @@ mod test {
 
     #[tokio::test]
     async fn start_with_override() {
-        let mut service = Service::new("", sleep_command(), vec!["10".to_string()], true, false, None)
-            .await
-            .unwrap();
+        let mut service = Service::new(
+            "",
+            sleep_command(),
+            vec!["10".to_string()],
+            true,
+            false,
+            None,
+        )
+        .await
+        .unwrap();
 
         service.start(Some(vec!["3".to_string()])).await.unwrap();
         tokio::time::sleep(std::time::Duration::from_millis(5000)).await;

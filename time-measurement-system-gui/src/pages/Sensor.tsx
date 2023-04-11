@@ -1,6 +1,13 @@
+import { Container } from "react-bootstrap";
+import SensorStatus from "../features/sensor/components/SensorStatus";
 import Page from "../ui/Page";
-import Todo from "../ui/Todo";
 
 export default function Sensor() {
-    return <Page><Todo /></Page>
+  return (
+    <Page>
+      <Container fluid>
+        <SensorStatus />
+      </Container>
+    </Page>
+  );
 }

@@ -1,6 +1,6 @@
 use clap::Parser;
 use futures::stream::StreamExt;
-use log::{debug, error};
+use log::{debug, error, trace};
 use prost::bytes::BytesMut;
 use serde::Deserialize;
 use std::{io, str};
@@ -100,7 +100,9 @@ async fn main() {
         .open_native_async()
         .expect("Failed to open serial io");
 
-    let client = proto::running_observer_client::RunningObserverClient::connect(config.server.addr)
+    trace!("Connecting to {}", config.server.addr);
+
+    let client = proto::running_observer_client::RunningObserverClient::connect("http://".to_owned() + config.server.addr.as_str())
         .await
         .unwrap();
 
