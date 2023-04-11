@@ -4,25 +4,25 @@
       "program": "time-measurement-system.exe",
       "default_args": ["--config", "config.json"],
       "default_start": true,
-      "allow_args_overrride": true
+      "allow_args_override": true
     },
     "gui": {
       "program": "time-measurement-system-gui.exe",
       "default_args": [],
       "default_start": true,
-      "allow_args_overrride": true
+      "allow_args_override": true
     },
     "sensor": {
       "program": "time-measurement-system-sensor-io.exe",
       "default_args": ["--config", "config.json", "--com", "COM3", "--baud", "9600"],
       "default_start": false,
-      "allow_args_overrride": true
+      "allow_args_override": true
     },
     "sleep": {
       "program": "timeout",
       "default_args": ["5"],
       "default_start": false,
-      "allow_args_overrride": true
+      "allow_args_override": true
     }
   },
   "record": {
