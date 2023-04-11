@@ -1,1 +1,0 @@
-type Meta = string;
