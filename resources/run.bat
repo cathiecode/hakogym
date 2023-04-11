@@ -1,0 +1,1 @@
+start service-manager.exe --config config.json

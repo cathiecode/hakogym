@@ -1,6 +1,8 @@
 import { spawnSync } from "node:child_process";
-import { copyFileSync, mkdirSync, rmSync, constants } from "node:fs";
+import fs from "fs-extra";
 import { join } from "node:path";
+
+const { copyFileSync, mkdirSync, rmSync, copySync } = fs;
 
 function execFile(fileName) {
   if (process.platform === "win32") {
@@ -42,8 +44,26 @@ function buildWithTauriNpm(project, name) {
   );
 }
 
+function buildWithNpm(project) {
+  const result = spawnSync("npm", ["run", "build"], {
+    cwd: project,
+    stdio: "inherit",
+    shell: true,
+  });
+
+  if (result.status !== 0) {
+    throw new Error(result.error);
+  }
+
+  copySync(
+    join(project, "build"),
+    join("build", project)
+  );
+}
+
+
 async function main() {
-  rmSync("build", { force: true, recursive: true });
+  /*rmSync("build", { force: true, recursive: true });
   mkdirSync("build");
   buildWithCargo("service-manager");
   buildWithCargo("time-measurement-system");
@@ -52,7 +72,9 @@ async function main() {
     "time-measurement-system-gui",
     "time-measurement-system-gui"
   );
-  copyFileSync(join("resources", "config.json"), join("build", "config.json"));
+  buildWithNpm("time-measurement-system-google-spreadsheet-sync");*/
+
+  copySync("resources", "build");
 }
 
 main().catch(console.error);

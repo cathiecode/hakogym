@@ -5,6 +5,7 @@ import Sensor from "./pages/Sensor";
 import Debug from "./pages/Debug";
 import Barrier from "./ui/Barrier";
 import ServiceStatusIcon from "./features/service_manager/components/ServiceStatusIcon";
+import SpreadSheet from "./pages/SpreadSheet";
 
 export default function Router() {
   const [tab, setTab] = useState("home");
@@ -18,8 +19,15 @@ export default function Router() {
     case "sensor":
       panel = <Sensor />;
       break;
+    case "spreadsheet":
+      panel = <SpreadSheet />;
+      break;
     case "debug":
-      panel = <Barrier><Debug /></Barrier>;
+      panel = (
+        <Barrier>
+          <Debug />
+        </Barrier>
+      );
       break;
     default:
       panel = <Alert variant="danger">この機能はまだ実装されていません</Alert>;
@@ -42,12 +50,15 @@ export default function Router() {
         </Nav.Item>
         <Nav.Item>
           <Nav.Link eventKey="sensor">
-          <ServiceStatusIcon service="sensor" />
+            <ServiceStatusIcon service="sensor" />
             光電管
           </Nav.Link>
         </Nav.Item>
         <Nav.Item>
-          <Nav.Link eventKey="spreadsheet">スプレッドシート</Nav.Link>
+          <Nav.Link eventKey="spreadsheet">
+            <ServiceStatusIcon service="google-spreadsheet-sync" />
+            スプレッドシート
+          </Nav.Link>
         </Nav.Item>
         <Nav.Item>
           <Nav.Link eventKey="vlc">VLC接続</Nav.Link>

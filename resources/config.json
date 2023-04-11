@@ -18,6 +18,12 @@
       "default_start": false,
       "allow_args_override": true
     },
+    "google-spreadsheet-sync": {
+      "program": "deps/node",
+      "default_args": ["time-measurement-system-google-spreadsheet-sync", "secrets/google-api-secret.json", "", "A1"],
+      "default_start": false,
+      "allow_args_override": true
+    },
     "sleep": {
       "program": "timeout",
       "default_args": ["5"],
