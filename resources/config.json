@@ -1,4 +1,11 @@
 {
+  "services": {
+    "sleep": {
+      "program": "timeout",
+      "default_args": ["5"],
+      "default_start": false
+    }
+  },
   "record": {
     "metadata": {
       "schema": {
@@ -24,12 +31,7 @@
             "type": "number"
           }
         },
-        "required": [
-          "carId",
-          "pylonTouchCount",
-          "derailmentCount",
-          "removed"
-        ]
+        "required": ["carId", "pylonTouchCount", "derailmentCount", "removed"]
       },
       "default": {
         "carId": "",
@@ -40,6 +42,7 @@
     }
   },
   "server": {
-    "addr": "[::1]:11000"
+    "addr": "[::1]:11000",
+    "service_manager_addr": "[::1]:11001"
   }
 }

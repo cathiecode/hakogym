@@ -281,8 +281,14 @@ struct ServiceConfig {
 }
 
 #[derive(Deserialize, Debug)]
+struct ServerConfig {
+    service_manager_addr: String,
+}
+
+#[derive(Deserialize, Debug)]
 struct Config {
     services: HashMap<String, ServiceConfig>,
+    server: ServerConfig,
 }
 
 #[derive(Parser)]
@@ -324,7 +330,7 @@ async fn main() {
         .add_service(tonic_web::enable(
             proto::service_manager_server::ServiceManagerServer::new(Arc::new(Mutex::new(service))),
         ))
-        .serve("[::1]:11001".parse().unwrap())
+        .serve(config.server.service_manager_addr.parse().unwrap())
         .await
         .unwrap();
 }
