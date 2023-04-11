@@ -1,0 +1,9 @@
+{
+    "services": {
+        "sleep": {
+            "program": "timeout",
+            "default_args": ["5"],
+            "default_start": false
+        }
+    }
+}

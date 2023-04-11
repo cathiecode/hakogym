@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package has.servicemanager;
+
+service ServiceManager {
+    rpc Start   (StartRequest) returns (CommandReply);
+    rpc Stop    (ServiceSpecificRequest) returns (CommandReply);
+    rpc Status  (StatusRequest) returns (StatusReply);
+}
+
+message ServiceSpecificRequest {
+    string id = 1;
+}
+
+message StartRequest {
+    string id = 1;
+    repeated string args = 2;
+    bool override_args = 3;
+}
+
+message StatusRequest {
+    
+}
+
+message CommandReply {
+    
+}
+
+message Service {
+    string id = 1;
+    string state = 2;
+    repeated string args = 3;
+}
+
+message StatusReply {
+    repeated Service services = 1;
+}
