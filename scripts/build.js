@@ -12,8 +12,7 @@ function execFile(fileName) {
 }
 
 function buildWithCargo(project) {
-  const result = spawnSync("cargo", ["build", "--release"], {
-    cwd: project,
+  const result = spawnSync("cargo", ["build", "--release", "-p", project], {
     stdio: "inherit",
   });
 
@@ -63,7 +62,7 @@ function buildWithNpm(project) {
 
 
 async function main() {
-  /*rmSync("build", { force: true, recursive: true });
+  rmSync("build", { force: true, recursive: true });
   mkdirSync("build");
   buildWithCargo("service-manager");
   buildWithCargo("time-measurement-system");
@@ -72,7 +71,7 @@ async function main() {
     "time-measurement-system-gui",
     "time-measurement-system-gui"
   );
-  buildWithNpm("time-measurement-system-google-spreadsheet-sync");*/
+  buildWithNpm("time-measurement-system-google-spreadsheet-sync");
 
   copySync("resources", "build");
 }
