@@ -1,8 +1,6 @@
 import { Button, Card, Form } from "react-bootstrap";
 import { useSensorStatus } from "../store";
-import { useForm } from "react-hook-form";
 import { ChangeEvent, useRef, useState } from "react";
-import { todo } from "../../../utils/todo";
 import Confirm from "../../../ui/Confirm";
 import showPromise from "../../../ui/toast";
 
@@ -45,7 +43,7 @@ export default function SensorStatus() {
       <Card.Header>光電管接続</Card.Header>
       <Card.Body>
         <p>
-          ステータス: <code>{status?.state}</code> (起動オプション:{" "}
+          ステータス: <code>{status?.state}</code> (起動オプション:
           <code>{status?.args.join(" ")}</code>)
         </p>
         <Form.Group className="mb-3" onSubmit={onStart}>

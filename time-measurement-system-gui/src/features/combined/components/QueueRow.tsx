@@ -32,7 +32,7 @@ export default function QueueRow({
           onConfirmed={() => onRemove && onRemove(item.id)}
         >
           {(props) => (
-            <Button {...props} variant="danger" className="mx-1">
+            <Button {...props} variant="danger">
               削除
             </Button>
           )}

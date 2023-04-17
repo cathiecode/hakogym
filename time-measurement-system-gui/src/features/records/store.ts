@@ -4,8 +4,6 @@ import { getRecordsAddress, pooledSubscribeAggrigatedChange } from "../../api";
 import useSWRSubscription, { SWRSubscriptionOptions } from "swr/subscription";
 import { ReadAllReply } from "../../types/proto/records";
 import { useCallback } from "react";
-import { parseMetaData } from "../meta/types";
-import { RpcError } from "grpc-web";
 import toast from "react-hot-toast";
 
 const client = () =>
@@ -62,19 +60,9 @@ export default function useRecords() {
     });
   }, []);
 
-  const getMetaData = useCallback(async (id: string) => {
-    const item = (await client().readAll({})).response.item.find(
-      (item) => item.id === id
-    );
-
-    if (!item) {
-      throw "アイテムが見つかりませんでした";
-    }
-
-    const metaData = parseMetaData(item.meta);
-
-    return metaData;
+  const remove = useCallback(async (id: string) => {
+    await client().remove({ id });
   }, []);
 
-  return { updateMetadata, ...swr };
+  return { updateMetadata, remove, ...swr };
 }

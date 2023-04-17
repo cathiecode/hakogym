@@ -18,7 +18,7 @@ import { faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
 import Loader from "../../../../ui/Loader";
 import { ReactElement } from "react";
 import Loading from "../../../../ui/Loading";
-import { todo } from "../../../../utils/todo";
+import Confirm from "../../../../ui/Confirm";
 
 const cx = classNames.bind(styles);
 
@@ -33,7 +33,7 @@ const LoadingRow = () => (
     <Loading />
   </JointRow>
 );
-const ErrorRow = (error: any) => (
+const ErrorRow = (error: unknown) => (
   <JointRow>
     <Alert variant="danger">
       データのロードに失敗しました。(e: {`${error}`})
@@ -41,7 +41,6 @@ const ErrorRow = (error: any) => (
         onClick={() => {
           location.reload();
         }}
-
         variant="secondary"
       >
         再読み込み
@@ -95,12 +94,18 @@ export default function CombinedTable() {
                 />
                 <td>{formatDuration(Number(item.time))}</td>
                 <td>
-                  <Button
-                    variant="danger"
-                    onClick={todo}
+                  <Confirm
+                    message={"記録を削除します。よろしいですか？"}
+                    onConfirmed={() => {
+                      records.remove(item.id);
+                    }}
                   >
-                    削除
-                  </Button>
+                    {(props) => (
+                      <Button variant="danger" {...props}>
+                        削除
+                      </Button>
+                    )}
+                  </Confirm>
                 </td>
               </tr>
             ))
