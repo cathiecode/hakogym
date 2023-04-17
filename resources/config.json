@@ -68,6 +68,7 @@
   },
   "server": {
     "addr": "[::1]:11000",
-    "service_manager_addr": "[::1]:11001"
+    "service_manager_addr": "[::1]:11001",
+    "vlc": "[::1]:11002"
   }
 }

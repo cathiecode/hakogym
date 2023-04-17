@@ -74,6 +74,7 @@ async function main() {
   buildWithNpm("time-measurement-system-google-spreadsheet-sync");
 
   copySync("resources", "build");
+  copySync(join("resources", "vlcrc"), join("build", "deps", "vlc", "Data", "settings", "vlcrc"));
 }
 
 main().catch(console.error);
