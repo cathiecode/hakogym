@@ -72,6 +72,7 @@ async function main() {
     "time-measurement-system-gui"
   );
   buildWithNpm("time-measurement-system-google-spreadsheet-sync");
+  buildWithNpm("time-measurement-system-vlc-connection");
 
   copySync("resources", "build");
   copySync(join("resources", "vlcrc"), join("build", "deps", "vlc", "Data", "settings", "vlcrc"));

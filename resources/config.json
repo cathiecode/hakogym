@@ -14,21 +14,33 @@
     },
     "sensor": {
       "program": "time-measurement-system-sensor-io.exe",
-      "default_args": ["--config", "config.json", "--com", "COM3", "--baud", "9600"],
+      "default_args": [
+        "--config",
+        "config.json",
+        "--com",
+        "COM3",
+        "--baud",
+        "9600"
+      ],
       "default_start": false,
       "allow_args_override": true
     },
     "google-spreadsheet-sync": {
       "program": "deps/node",
-      "default_args": ["time-measurement-system-google-spreadsheet-sync", "secrets/google-api-secret.json", "", "A1"],
+      "default_args": [
+        "time-measurement-system-google-spreadsheet-sync/index.cjs",
+        "secrets/google-api-secret.json",
+        "",
+        "A1"
+      ],
       "default_start": false,
       "allow_args_override": true
     },
-    "sleep": {
-      "program": "timeout",
-      "default_args": ["5"],
+    "time-measurement-system-vlc-connection": {
+      "program": "deps/node",
+      "default_args": ["time-measurement-system-vlc-connection/index.cjs"],
       "default_start": false,
-      "allow_args_override": true
+      "allow_args_override": false
     }
   },
   "record": {

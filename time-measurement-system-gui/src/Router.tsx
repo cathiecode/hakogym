@@ -6,6 +6,8 @@ import Debug from "./pages/Debug";
 import Barrier from "./ui/Barrier";
 import ServiceStatusIcon from "./features/service_manager/components/ServiceStatusIcon";
 import SpreadSheet from "./pages/SpreadSheet";
+import VLCStatus from "./features/vlc/components/VLCStatus";
+import VLC from "./pages/VLC";
 
 export default function Router() {
   const [tab, setTab] = useState("home");
@@ -21,6 +23,9 @@ export default function Router() {
       break;
     case "spreadsheet":
       panel = <SpreadSheet />;
+      break;
+    case "vlc":
+      panel = <VLC />
       break;
     case "debug":
       panel = (
@@ -44,7 +49,7 @@ export default function Router() {
       >
         <Nav.Item>
           <Nav.Link eventKey="home">
-            <ServiceStatusIcon service="main" />
+          <ServiceStatusIcon service="main" />
             Home
           </Nav.Link>
         </Nav.Item>
@@ -61,7 +66,10 @@ export default function Router() {
           </Nav.Link>
         </Nav.Item>
         <Nav.Item>
-          <Nav.Link eventKey="vlc">VLC接続</Nav.Link>
+          <Nav.Link eventKey="vlc">
+            <ServiceStatusIcon service="time-measurement-system-vlc-connection" />
+            VLC接続
+          </Nav.Link>
         </Nav.Item>
         <Nav.Item>
           <Nav.Link eventKey="backup">バックアップ</Nav.Link>
