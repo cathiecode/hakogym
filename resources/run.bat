@@ -1,2 +1,2 @@
 start ./deps/vlc/VLCPortable.exe
-start service-manager.exe --config config.json
+start /min service-manager.exe --config config.json
