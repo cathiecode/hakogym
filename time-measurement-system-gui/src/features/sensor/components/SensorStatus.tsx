@@ -1,6 +1,6 @@
 import { Button, Card, Form } from "react-bootstrap";
-import { useSensorStatus } from "../store";
-import { ChangeEvent, useRef, useState } from "react";
+import { useSensorSources, useSensorStatus } from "../store";
+import { useState } from "react";
 import Confirm from "../../../ui/Confirm";
 import showPromise from "../../../ui/toast";
 
@@ -13,8 +13,7 @@ function useInputHandler(
   }
 ) {
   const [value, setValue] = useState(options?.defaultValue ?? "");
-  const ref = useRef<HTMLInputElement>(null);
-  const onChange = (ev: ChangeEvent<HTMLInputElement>) => {
+  const onChange = (ev: { currentTarget: { value: string } }) => {
     console.log("change", ev.currentTarget.value);
 
     setValue(ev.currentTarget.value);
@@ -26,13 +25,14 @@ function useInputHandler(
     options?.onChange(id, ev.currentTarget.value);
   };
 
-  return [value, { value, onChange, onBlur: options?.onBlur, ref }] as const;
+  return [value, { value, onChange, onBlur: options?.onBlur }] as const;
 }
 
 export default function SensorStatus() {
   const { status, start, stop } = useSensorStatus();
 
   const [com, comInputHandler] = useInputHandler("com");
+  const sources = useSensorSources();
 
   const onStart = () => {
     showPromise(start({ com }), `${com}で光電管接続を開始`);
@@ -48,8 +48,21 @@ export default function SensorStatus() {
         </p>
         <Form.Group className="mb-3" onSubmit={onStart}>
           <Form.Label>COMポート</Form.Label>
-          <Form.Control {...comInputHandler} />
+          <Form.Select {...comInputHandler}>
+            {sources.data?.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </Form.Select>
         </Form.Group>
+        <details>
+          <summary>高度な設定</summary>
+          <Form.Group>
+            <Form.Label>COMポートを手動設定</Form.Label>
+            <Form.Control {...comInputHandler} />
+          </Form.Group>
+        </details>
         <Button className="me-2" onClick={onStart}>
           起動
         </Button>
