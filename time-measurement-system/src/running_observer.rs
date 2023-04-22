@@ -3,12 +3,13 @@ use async_trait::async_trait;
 use jsonschema::{JSONSchema, ValidationError};
 use log::{debug, error, trace};
 use nanoid::nanoid;
+use serde::{Serialize, Deserialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
 use crate::{prelude::*, Config};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RunningCar {
     car_id: RunningCarId,
     start_at: TimeStamp,
@@ -167,6 +168,14 @@ impl RunningObserver {
 
     pub fn watcher(&self) -> &tokio::sync::watch::Receiver<Vec<RunningCar>> {
         &self.watcher
+    }
+
+    pub fn read(&self) -> &Vec<RunningCar> {
+        &self.running_car
+    }
+
+    pub fn replace(&mut self, cars: Vec<RunningCar>)  {
+        self.running_car = cars;
     }
 
     fn find_car_index(&mut self, car_id: &RunningCarId) -> Result<usize> {

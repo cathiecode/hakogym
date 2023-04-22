@@ -11,3 +11,7 @@ pub mod running_observer {
 pub mod aggrigated_change_broadcaster {
     tonic::include_proto!("has.aggrigatedchangebroadcaster");
 }
+
+pub mod file_persistance {
+    tonic::include_proto!("has.filepersistance");
+}

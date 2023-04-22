@@ -3,14 +3,21 @@ use async_trait::async_trait;
 use jsonschema::{JSONSchema, ValidationError};
 use log::{error, trace};
 use nanoid::nanoid;
+use serde::{Serialize, Deserialize};
 
 use crate::{config::Config, prelude::*};
 
 // TODO: validate metadata
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PendingCar {
     id: String,
     meta: MetaData,
+}
+
+impl PendingCar {
+    pub fn meta(&self) -> &MetaData {
+        &self.meta
+    }
 }
 
 pub struct PendingCarQueue {
@@ -185,6 +192,10 @@ impl PendingCarQueue {
 
     pub fn watcher(&self) -> &tokio::sync::watch::Receiver<Vec<PendingCar>> {
         &self.watcher
+    }
+
+    pub fn read(&self) -> &Vec<PendingCar> {
+        &self.queue
     }
 
     fn find_car_index(&mut self, car_id: &str) -> Result<usize> {

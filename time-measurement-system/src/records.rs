@@ -5,12 +5,14 @@ use async_trait::async_trait;
 use jsonschema::JSONSchema;
 use log::{debug, error};
 use nanoid::nanoid;
+use serde::Deserialize;
+use serde::Serialize;
 
 use crate::prelude::*;
 use crate::running_observer;
 use crate::Config;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Record {
     pub record_id: String,
     pub duration: Duration,
@@ -92,6 +94,14 @@ impl Records {
 
     pub fn watcher(&self) -> &tokio::sync::watch::Receiver<Vec<Record>> {
         &self.watcher
+    }
+
+    pub fn replace(&mut self, records: Vec<Record>) {
+        self.records = records;
+    }
+
+    pub fn read(&self) -> &Vec<Record> {
+        &self.records
     }
 
     fn promote_change(&self) {

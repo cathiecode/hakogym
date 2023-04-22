@@ -20,6 +20,7 @@ spawnSync(
     "../proto/records.proto",
     "../proto/aggrigated_change_broadcaster.proto",
     "../proto/service_manager.proto",
+    "../proto/file_persistance.proto",
   ],
   { stdio: "inherit", shell: true }
 );

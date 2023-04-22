@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package has.filepersistance;
+
+service FilePersistance {
+  rpc Save(SaveRequest) returns (CommandReply) {}
+  rpc Load(LoadRequest) returns (CommandReply) {}
+}
+
+message SaveRequest {
+  string file = 1;
+}
+
+message LoadRequest {
+  string file = 1;
+}
+
+message CommandReply {
+  
+}

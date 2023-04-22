@@ -16,6 +16,7 @@ mod prelude {
 mod aggrigated_change_broadcaster;
 mod config;
 mod pending_car_queue;
+mod persistance;
 mod proto;
 mod records;
 mod running_observer;
@@ -53,8 +54,15 @@ async fn main() {
             observer.clone(),
             pending_car_queue.clone(),
             records.clone(),
-        ).await,
+        )
+        .await,
     ));
+
+    let file_persistance = Arc::new(Mutex::new(persistance::FilePersistance::new(
+        pending_car_queue.clone(),
+        observer.clone(),
+        records.clone(),
+    )));
 
     tonic::transport::Server::builder()
         .accept_http1(true)
@@ -62,5 +70,6 @@ async fn main() {
         .add_service(tonic_web::enable(proto::pending_car_queue::pending_car_queue_server::PendingCarQueueServer::new(pending_car_queue)))
         .add_service(tonic_web::enable(proto::records::records_server::RecordsServer::new(records)))
         .add_service(tonic_web::enable(proto::aggrigated_change_broadcaster::aggrigated_change_broadcaster_server::AggrigatedChangeBroadcasterServer::new(aggrigated_change_broadcaster)))
+        .add_service(tonic_web::enable(proto::file_persistance::file_persistance_server::FilePersistanceServer::new(file_persistance)))
         .serve(config.server.addr.parse().unwrap()).await.unwrap();
 }

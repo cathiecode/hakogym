@@ -8,6 +8,7 @@ import ServiceStatusIcon from "./features/service_manager/components/ServiceStat
 import SpreadSheet from "./pages/SpreadSheet";
 import VLCStatus from "./features/vlc/components/VLCStatus";
 import VLC from "./pages/VLC";
+import File from "./pages/File";
 
 export default function Router() {
   const [tab, setTab] = useState("home");
@@ -26,6 +27,9 @@ export default function Router() {
       break;
     case "vlc":
       panel = <VLC />
+      break;
+    case "file":
+      panel = <File />;
       break;
     case "debug":
       panel = (
@@ -72,7 +76,7 @@ export default function Router() {
           </Nav.Link>
         </Nav.Item>
         <Nav.Item>
-          <Nav.Link eventKey="backup">バックアップ</Nav.Link>
+          <Nav.Link eventKey="file">ファイル</Nav.Link>
         </Nav.Item>
         <Nav.Item>
           <Nav.Link eventKey="debug">デバッグ</Nav.Link>

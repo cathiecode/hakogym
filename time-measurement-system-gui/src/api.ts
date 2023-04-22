@@ -19,6 +19,10 @@ export function getAggrigatedChangeBroadcasterAddress() {
   return "http://localhost:11000";
 }
 
+export function getFilePersistanceAddress() {
+  return "http://localhost:11000";
+}
+
 export function getServiceManagerAddress() {
   return "http://localhost:11001";
 }
