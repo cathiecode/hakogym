@@ -21,7 +21,7 @@ function buildWithCargo(project) {
   }
 
   copyFileSync(
-    join(project, "target", "release", execFile(project)),
+    join("target", "release", execFile(project)),
     join("build", execFile(project))
   );
 }
@@ -38,7 +38,7 @@ function buildWithTauriNpm(project, name) {
   }
 
   copyFileSync(
-    join(project, "src-tauri", "target", "release", execFile(name)),
+    join("target", "release", execFile(project)),
     join("build", execFile(project))
   );
 }
