@@ -65,7 +65,7 @@
             "type": "boolean"
           },
           "heat": {
-            "type": "number"
+            "type": "string"
           }
         },
         "required": ["carId", "pylonTouchCount", "derailmentCount", "removed"]
@@ -74,6 +74,7 @@
         "carId": "",
         "pylonTouchCount": 0,
         "derailmentCount": 0,
+        "heat": "",
         "removed": false
       }
     }

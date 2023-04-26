@@ -59,6 +59,13 @@ function MetaCellsInner(props: MetaCellsProps) {
         )}
       </EditableValue>
       <EditableValue
+        value={value.heat}
+        onChange={(newValue) => change({ ...value, heat: newValue })}
+        readonly={!props.onChange}
+      >
+        {(props) => <td {...props} />}
+      </EditableValue>
+      <EditableValue
         value={value.pylonTouchCount.toString(10)}
         onChange={(newValue) =>
           change({ ...value, pylonTouchCount: Number(newValue) })

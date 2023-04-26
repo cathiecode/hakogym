@@ -4,7 +4,7 @@ export type ParsedMetaData = {
     derailmentCount: number,
     status?: "DNS" | "MC" | "DNF",
     removed: boolean,
-    heat?: number
+    heat: string
 };
 
 export function parseMetaData(metaData: string): ParsedMetaData {
@@ -21,6 +21,6 @@ export function defaultMetaData(): string {
         pylonTouchCount: 0,
         derailmentCount: 0,
         removed: false,
-        heat: 0
+        heat: ""
     });
 }
