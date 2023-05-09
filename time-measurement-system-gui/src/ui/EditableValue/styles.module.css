@@ -1,0 +1,14 @@
+.input {
+  border: none;
+  background-color: transparent;
+  margin: 0;
+  padding: 0;
+  flex: 1 1;
+  width: 0;
+  display: inline;
+  outline: none;
+}
+
+.input--error {
+  text-decoration: red underline;
+}

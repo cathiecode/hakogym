@@ -1,0 +1,9 @@
+{
+    "type": "module",
+    "scripts": {
+        "build": "node scripts/build.js"
+    },
+    "devDependencies": {
+        "fs-extra": "^11.1.1"
+    }
+}

@@ -1,0 +1,16 @@
+.table thead {
+  box-sizing: border-box;
+  position: sticky;
+  top: 0;
+  background-color: #fff
+}
+
+.tabl th, .table td {
+  vertical-align: middle;
+}
+
+.highlighted {
+  background-color: var(--bs-info);
+  /*position: sticky;
+  bottom: 0;*/
+}

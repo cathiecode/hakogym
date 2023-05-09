@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package has.aggrigatedchangebroadcaster;
+
+service AggrigatedChangeBroadcaster {
+    rpc SubscribeChange (SubscribeChangeRequest) returns(stream SubscribeChangeReply) {}
+}
+
+message SubscribeChangeRequest {
+    
+}
+
+message SubscribeChangeReply {
+    
+}

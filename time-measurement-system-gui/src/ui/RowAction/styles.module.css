@@ -1,0 +1,31 @@
+.RowAction {
+    position: relative;
+}
+
+.insertButton {
+    position: absolute;
+    border: none;
+    background-color: #fff;
+    border-radius: 50%;
+    width: 2em;
+    height: 2em;
+    line-height: 2em;
+    padding: 0;
+    box-shadow: 0px 0px 0.1em rgba(0, 0, 0, 0.5), 0px 0px 0.5em rgba(0, 0, 0, 0.1);
+}
+
+.RowAction:not(:hover) .insertButton {
+    display: none;
+}
+
+.insertButton--before {
+    top: 0;
+    right: 0;
+    transform: translate(50%, -50%);
+}
+
+.insertButton--after {
+    bottom: 0;
+    right: 0;
+    transform: translate(50%, 50%);
+}

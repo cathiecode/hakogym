@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+package has.runningobserver;
+
+import "google/protobuf/wrappers.proto";
+
+// `RunningObserver` サービスはトラック上の車両の記録を管理します。それぞれのコマンドリクエストにはtimestampが必要で、以前に発行されたコマンドのtimestampより小さい値を持つコマンドは実行が拒否されます。
+service RunningObserver {
+  // PendingCarQueueサービスから一番後ろにある車両データを取り出し走行開始日時を記録します。
+  rpc Start(StartCommandRequest) returns(CommandReply) {}
+
+  // 走行中の車両を停止させ、走行時間を計算し、Recordsサービスに保存します。
+  rpc Stop(StopCommandRequest) returns (CommandReply) {}
+
+  // 走行中の車両があれば、そのうち一番最初に走行を開始したものをStopします。走行中の車両がなければStartします。
+  rpc FlipRunningState(FlipRunningStateCommandRequest) returns (CommandReply) {}
+
+  // 走行中の車両のメタデータを更新します。メタデータはconfigファイルのJSON Schemaに従っている必要があります。
+  rpc UpdateMetadata(UpdateMetadataCommandRequest) returns (CommandReply) {}
+
+  rpc ReadAll(ReadAllRequest) returns (ReadAllReply) {}
+
+  rpc SubscribeChange (SubscribeChangeRequest) returns(stream ReadAllReply) {}
+}
+
+message Item {
+  int64 start_at = 1;
+  string meta = 2;
+  string id = 3;
+}
+
+message StartCommandRequest {
+  int64 timestamp = 1;
+}
+
+message StopCommandRequest {
+  int64 timestamp = 1;
+  google.protobuf.StringValue id = 2;
+}
+
+message FlipRunningStateCommandRequest {
+  int64 timestamp = 1;
+}
+
+message UpdateMetadataCommandRequest {
+  int64 timestamp = 1;
+  string id = 2;
+  string metadata = 3;
+}
+
+message ReadAllRequest {
+
+}
+
+message SubscribeChangeRequest {
+  
+}
+
+
+message CommandReply {
+  
+}
+
+message ReadAllReply {
+  repeated Item item = 1;
+}

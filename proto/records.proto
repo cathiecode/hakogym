@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+package has.records;
+
+import "google/protobuf/wrappers.proto";
+
+service Records {
+    rpc Insert(InsertRequest) returns (CommandReply) {}
+    rpc Remove(RemoveRequest) returns (CommandReply) {}
+    rpc Update(UpdateRequest) returns (CommandReply) {}
+
+    // rpc InsertMany(InsertManyRequest) returns (CommandReply) {}
+    rpc RemoveAll(RemoveAllRequest) returns (CommandReply) {}
+    // rpc ReplaceAll(ReplaceAllRequest) returns (CommandReply) {}
+    rpc ReadAll(ReadAllRequest) returns (ReadAllReply) {}
+
+    rpc SubscribeChange (SubscribeChangeRequest) returns(stream ReadAllReply) {}
+}
+
+message Item {
+    string meta = 1;
+    int64 time = 2;
+}
+
+message InsertedItem {
+    string id = 1;
+    string meta = 2;
+    int64 time = 3;
+}
+
+message CommandReply {
+
+}
+
+message InsertRequest {
+    Item item = 1;
+}
+
+message RemoveRequest {
+    string id = 1;
+}
+
+message UpdateRequest {
+    InsertedItem item = 1;
+}
+
+message InsertManyRequest {
+    repeated Item item = 1;
+    google.protobuf.UInt32Value position = 2;
+}
+
+message RemoveAllRequest {
+
+}
+
+message ReplaceAllRequest {
+    repeated Item item = 1;
+}
+
+message ReadAllRequest {
+
+}
+
+message ReadAllReply {
+    repeated InsertedItem item = 1;
+}
+
+message SubscribeChangeRequest {
+
+}

@@ -1,0 +1,12 @@
+{
+    "services": {
+        "sleep": {
+            "program": "timeout",
+            "default_args": ["5"],
+            "default_start": false
+        }
+    },
+    "server": {
+        "service_manager_addr": "[::1]:11001"
+    }
+}

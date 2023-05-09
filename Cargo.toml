@@ -1,0 +1,8 @@
+[workspace]
+
+members = [
+    "service-manager",
+    "time-measurement-system",
+    "time-measurement-system-gui/src-tauri",
+    "time-measurement-system-sensor-io",
+]
