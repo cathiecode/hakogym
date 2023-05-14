@@ -14,7 +14,7 @@ type RunningObserverRunningCarControlProps = {
 export default function RunningObserverRunningCarControl({
   item,
 }: RunningObserverRunningCarControlProps) {
-  const { dnf, offsetPylonTouchCount, offsetDerailmentCount } =
+  const { mc, dnf, offsetPylonTouchCount, offsetDerailmentCount } =
     useRunnningObserverState();
 
   const metaData = useMemo(() => {
@@ -100,7 +100,7 @@ export default function RunningObserverRunningCarControl({
 
           <Confirm
             message="MCとして記録しますか？"
-            onConfirmed={() => item?.id && dnf(item.id)}
+            onConfirmed={() => item?.id && mc(item.id)}
           >
             {(props) => (
               <Button

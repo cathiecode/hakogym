@@ -95,6 +95,14 @@ export const useRunnningObserverState = () => {
     [getMetaData, updateMetadata]
   );
 
+  const mc = useCallback(
+    async (id: string) => {
+      await changeMetaData(id, (metadata) => ({ ...metadata, status: "MC" }));
+      await forceStop(id);
+    },
+    [changeMetaData, forceStop]
+  );
+
   const dnf = useCallback(
     async (id: string) => {
       await changeMetaData(id, (metadata) => ({ ...metadata, status: "DNF" }));
@@ -126,6 +134,7 @@ export const useRunnningObserverState = () => {
   return {
     forceStart,
     forceStop,
+    mc,
     dnf,
     offsetPylonTouchCount,
     offsetDerailmentCount,
