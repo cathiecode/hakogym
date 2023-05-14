@@ -16,3 +16,5 @@ Cargo.lock
 build/
 
 node_modules
+
+src/types/config.json.ts

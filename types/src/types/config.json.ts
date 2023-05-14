@@ -1,4 +1,4 @@
-{
+export default {
   "services": {
     "main": {
       "program": "time-measurement-system.exe",
@@ -86,4 +86,4 @@
     "service_manager_addr": "[::1]:11001",
     "vlc": "[::1]:11002"
   }
-}
+} as const;

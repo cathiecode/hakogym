@@ -59,7 +59,7 @@ function MetaCellsInner(props: MetaCellsProps) {
         )}
       </EditableValue>
       <EditableValue
-        value={value.heat}
+        value={value.heat ?? ""}
         onChange={(newValue) => change({ ...value, heat: newValue })}
         readonly={!props.onChange}
       >
